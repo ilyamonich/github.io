@@ -1006,4 +1006,437 @@
             html.find('.online-prestige__timeline').append(Lampa.Timeline.render(Lampa.Timeline.view(Lampa.Utils.hash([season, episode.episode_number, object.movie.original_title].join('')))));
             var img = html.find('img')[0];
 
-            if (episode.still_path)
+            if (episode.still_path) {
+              img.onerror = function() {
+                img.src = './img/img_broken.svg';
+              };
+
+              img.onload = function() {
+                image.addClass('online-prestige__img--loaded');
+                loader.remove();
+                image.append('<div class="online-prestige__episode-number">' + ('0' + episode.episode_number).slice(-2) + '</div>');
+              };
+
+              img.src = Lampa.TMDB.image('t/p/w300' + episode.still_path);
+              images.push(img);
+            } else {
+              loader.remove();
+              image.append('<div class="online-prestige__episode-number">' + ('0' + episode.episode_number).slice(-2) + '</div>');
+            }
+
+            html.on('hover:focus', function(e) {
+              last = e.target;
+              scroll.update($(e.target), true);
+            });
+            scroll.append(html);
+          });
+        }
+
+        if (scroll_to_element) {
+          last = scroll_to_element[0];
+        } else if (scroll_to_mark) {
+          last = scroll_to_mark[0];
+        }
+
+        Lampa.Controller.enable('content');
+      });
+    };
+
+    this.contextMenu = function(params) {
+      params.html.on('hover:long', function() {
+        function show(extra) {
+          var enabled = Lampa.Controller.enabled().name;
+          var menu = [];
+
+          if (Lampa.Platform.is('webos')) {
+            menu.push({
+              title: Lampa.Lang.translate('player_lauch') + ' - Webos',
+              player: 'webos'
+            });
+          }
+
+          if (Lampa.Platform.is('android')) {
+            menu.push({
+              title: Lampa.Lang.translate('player_lauch') + ' - Android',
+              player: 'android'
+            });
+          }
+
+          menu.push({
+            title: Lampa.Lang.translate('player_lauch') + ' - Lampa',
+            player: 'lampa'
+          });
+          menu.push({
+            title: Lampa.Lang.translate('online_video'),
+            separator: true
+          });
+          menu.push({
+            title: Lampa.Lang.translate('torrent_parser_label_title'),
+            mark: true
+          });
+          menu.push({
+            title: Lampa.Lang.translate('torrent_parser_label_cancel_title'),
+            unmark: true
+          });
+          menu.push({
+            title: Lampa.Lang.translate('time_reset'),
+            timeclear: true
+          });
+
+          if (extra) {
+            menu.push({
+              title: Lampa.Lang.translate('copy_link'),
+              copylink: true
+            });
+          }
+
+          menu.push({
+            title: Lampa.Lang.translate('more'),
+            separator: true
+          });
+
+          if (Lampa.Account.logged() && params.element && typeof params.element.season !== 'undefined' && params.element.translate_voice) {
+            menu.push({
+              title: Lampa.Lang.translate('online_voice_subscribe'),
+              subscribe: true
+            });
+          }
+
+          menu.push({
+            title: Lampa.Lang.translate('online_clear_all_marks'),
+            clearallmark: true
+          });
+          menu.push({
+            title: Lampa.Lang.translate('online_clear_all_timecodes'),
+            timeclearall: true
+          });
+          Lampa.Select.show({
+            title: Lampa.Lang.translate('title_action'),
+            items: menu,
+            onBack: function onBack() {
+              Lampa.Controller.toggle(enabled);
+            },
+            onSelect: function onSelect(a) {
+              if (a.mark) params.element.mark();
+              if (a.unmark) params.element.unmark();
+              if (a.timeclear) params.element.timeclear();
+              if (a.clearallmark) params.onClearAllMark();
+              if (a.timeclearall) params.onClearAllTime();
+              Lampa.Controller.toggle(enabled);
+
+              if (a.player) {
+                Lampa.Player.runas(a.player);
+                params.html.trigger('hover:enter');
+              }
+
+              if (a.copylink) {
+                if (extra.quality) {
+                  var qual = [];
+
+                  for (var i in extra.quality) {
+                    qual.push({
+                      title: i,
+                      file: extra.quality[i]
+                    });
+                  }
+
+                  Lampa.Select.show({
+                    title: Lampa.Lang.translate('settings_server_links'),
+                    items: qual,
+                    onBack: function onBack() {
+                      Lampa.Controller.toggle(enabled);
+                    },
+                    onSelect: function onSelect(b) {
+                      Lampa.Utils.copyTextToClipboard(b.file, function() {
+                        Lampa.Noty.show(Lampa.Lang.translate('copy_secuses'));
+                      }, function() {
+                        Lampa.Noty.show(Lampa.Lang.translate('copy_error'));
+                      });
+                    }
+                  });
+                } else {
+                  Lampa.Utils.copyTextToClipboard(extra.file, function() {
+                    Lampa.Noty.show(Lampa.Lang.translate('copy_secuses'));
+                  }, function() {
+                    Lampa.Noty.show(Lampa.Lang.translate('copy_error'));
+                  });
+                }
+              }
+
+              if (a.subscribe) {
+                Lampa.Account.subscribeToTranslation({
+                  card: object.movie,
+                  season: params.element.season,
+                  episode: params.element.translate_episode_end,
+                  voice: params.element.translate_voice
+                }, function() {
+                  Lampa.Noty.show(Lampa.Lang.translate('online_voice_success'));
+                }, function() {
+                  Lampa.Noty.show(Lampa.Lang.translate('online_voice_error'));
+                });
+              }
+            }
+          });
+        }
+
+        params.onFile(show);
+      }).on('hover:focus', function() {
+        if (Lampa.Helper) Lampa.Helper.show('online_file', Lampa.Lang.translate('helper_online_file'), params.html);
+      });
+    };
+
+    this.empty = function(msg) {
+      var html = Lampa.Template.get('online_does_not_answer', {});
+      html.find('.online-empty__buttons').remove();
+      html.find('.online-empty__title').text(Lampa.Lang.translate('empty_title_two'));
+      scroll.append(html);
+      this.loading(false);
+    };
+
+    this.doesNotAnswer = function() {
+      var _this6 = this;
+
+      this.reset();
+      var html = Lampa.Template.get('online_does_not_answer', {
+        balanser: balanser
+      });
+
+      scroll.append(html);
+      this.loading(false);
+    };
+
+    this.getLastEpisode = function(items) {
+      var last_episode = 0;
+      items.forEach(function(e) {
+        if (typeof e.episode !== 'undefined') last_episode = Math.max(last_episode, parseInt(e.episode));
+      });
+      return last_episode;
+    };
+
+    this.start = function() {
+      if (Lampa.Activity.active().activity !== this.activity) return;
+
+      if (!initialized) {
+        initialized = true;
+        this.initialize();
+      }
+
+      Lampa.Background.immediately(Lampa.Utils.cardImgBackgroundBlur(object.movie));
+      Lampa.Controller.add('content', {
+        toggle: function toggle() {
+          Lampa.Controller.collectionSet(scroll.render(), files.render());
+          Lampa.Controller.collectionFocus(last || false, scroll.render());
+        },
+        up: function up() {
+          if (Navigator.canmove('up')) {
+            Navigator.move('up');
+          } else Lampa.Controller.toggle('head');
+        },
+        down: function down() {
+          Navigator.move('down');
+        },
+        right: function right() {
+          if (Navigator.canmove('right')) Navigator.move('right');
+          else filter.show(Lampa.Lang.translate('title_filter'), 'filter');
+        },
+        left: function left() {
+          if (Navigator.canmove('left')) Navigator.move('left');
+          else Lampa.Controller.toggle('menu');
+        },
+        gone: function gone() {
+          clearInterval(balanser_timer);
+        },
+        back: this.back
+      });
+      Lampa.Controller.toggle('content');
+    };
+
+    this.render = function() {
+      return files.render();
+    };
+
+    this.back = function() {
+      Lampa.Activity.backward();
+    };
+
+    this.pause = function() {};
+
+    this.stop = function() {};
+
+    this.destroy = function() {
+      network.clear();
+      this.clearImages();
+      files.destroy();
+      scroll.destroy();
+      clearInterval(balanser_timer);
+      if (source && source.destroy) source.destroy();
+      if (modalopen) {modalopen = false; Lampa.Modal.close();}
+	  clearInterval(ping_auth);
+    };
+  }
+
+  function startPlugin() {
+    window.online_kinogo = true;
+    var manifest = {
+      type: 'video',
+      version: '1.0.0',
+      name: 'Онлайн - Kinogo',
+      description: 'Плагин для просмотра онлайн сериалов и фильмов с Kinogo.ec',
+      component: 'online_kinogo',
+      onContextMenu: function onContextMenu(object) {
+        return {
+          name: Lampa.Lang.translate('online_watch'),
+          description: ''
+        };
+      },
+      onContextLauch: function onContextLauch(object) {
+        resetTemplates();
+        Lampa.Component.add('online_kinogo', component);
+        Lampa.Activity.push({
+          url: '',
+          title: Lampa.Lang.translate('title_online'),
+          component: 'online_kinogo',
+          search: object.title,
+          search_one: object.title,
+          search_two: object.original_title,
+          movie: object,
+          page: 1
+        });
+      }
+    };
+    Lampa.Manifest.plugins = manifest;
+    Lampa.Lang.add({
+      online_watch: {
+        ru: 'Смотреть онлайн',
+        en: 'Watch online',
+        ua: 'Дивитися онлайн',
+        zh: '在线观看'
+      },
+      online_video: {
+        ru: 'Видео',
+        en: 'Video',
+        ua: 'Відео',
+        zh: '视频'
+      },
+      online_nolink: {
+        ru: 'Не удалось извлечь ссылку',
+        uk: 'Неможливо отримати посилання',
+        en: 'Failed to fetch link',
+        zh: '获取链接失败'
+      },
+      helper_online_file: {
+        ru: 'Удерживайте клавишу "ОК" для вызова контекстного меню',
+        uk: 'Утримуйте клавішу "ОК" для виклику контекстного меню',
+        en: 'Hold the "OK" key to bring up the context menu',
+        zh: '按住"确定"键调出上下文菜单'
+      },
+      title_online: {
+        ru: 'Онлайн',
+        uk: 'Онлайн',
+        en: 'Online',
+        zh: '在线的'
+      },
+      copy_secuses: {
+        ru: 'Код скопирован в буфер обмена',
+        uk: 'Код скопійовано в буфер обміну',
+        en: 'Code copied to clipboard',
+        zh: '代码复制到剪贴板'
+      },
+      copy_fail: {
+        ru: 'Ошибка при копировании',
+        uk: 'Помилка при копіюванні',
+        en: 'Copy error',
+        zh: '复制错误'
+      },
+      title_status: {
+        ru: 'Статус',
+        uk: 'Статус',
+        en: 'Status',
+        zh: '地位'
+      },
+      online_voice_subscribe: {
+        ru: 'Подписаться на перевод',
+        uk: 'Підписатися на переклад',
+        en: 'Subscribe to translation',
+        zh: '订阅翻译'
+      },
+      online_voice_success: {
+        ru: 'Вы успешно подписались',
+        uk: 'Ви успішно підписалися',
+        en: 'You have successfully subscribed',
+        zh: '您已成功订阅'
+      },
+      online_voice_error: {
+        ru: 'Возникла ошибка',
+        uk: 'Виникла помилка',
+        en: 'An error has occurred',
+        zh: '发生了错误'
+      },
+      online_clear_all_marks: {
+        ru: 'Очистить все метки',
+        uk: 'Очистити всі мітки',
+        en: 'Clear all labels',
+        zh: '清除所有标签'
+      },
+      online_clear_all_timecodes: {
+        ru: 'Очистить все тайм-коды',
+        uk: 'Очистити всі тайм-коди',
+        en: 'Clear all timecodes',
+        zh: '清除所有时间代码'
+      },
+      online_balanser_dont_work: {
+        ru: 'Поиск не дал результатов',
+        uk: 'Пошук не дав результатів',
+        en: 'The search did not return any results',
+        zh: '平衡器 未响应请求。'
+      }
+    });
+    Lampa.Template.add('online_prestige_css', "\n        <style>\n        @charset 'UTF-8';.online-prestige{position:relative;-webkit-border-radius:.3em;-moz-border-radius:.3em;border-radius:.3em;background-color:rgba(0,0,0,0.3);display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;will-change:transform}.online-prestige__body{padding:1.2em;line-height:1.3;-webkit-box-flex:1;-webkit-flex-grow:1;-moz-box-flex:1;-ms-flex-positive:1;flex-grow:1;position:relative}@media screen and (max-width:480px){.online-prestige__body{padding:.8em 1.2em}}.online-prestige__img{position:relative;width:13em;-webkit-flex-shrink:0;-ms-flex-negative:0;flex-shrink:0;min-height:8.2em}.online-prestige__img>img{position:absolute;top:0;left:0;width:100%;height:100%;-o-object-fit:cover;object-fit:cover;-webkit-border-radius:.3em;-moz-border-radius:.3em;border-radius:.3em;opacity:0;-webkit-transition:opacity .3s;-o-transition:opacity .3s;-moz-transition:opacity .3s;transition:opacity .3s}.online-prestige__img--loaded>img{opacity:1}@media screen and (max-width:480px){.online-prestige__img{width:7em;min-height:6em}}.online-prestige__folder{padding:1em;-webkit-flex-shrink:0;-ms-flex-negative:0;flex-shrink:0}.online-prestige__folder>svg{width:4.4em !important;height:4.4em !important}.online-prestige__viewed{position:absolute;top:1em;left:1em;background:rgba(0,0,0,0.45);-webkit-border-radius:100%;-moz-border-radius:100%;border-radius:100%;padding:.25em;font-size:.76em}.online-prestige__viewed>svg{width:1.5em !important;height:1.5em !important}.online-prestige__episode-number{position:absolute;top:0;left:0;right:0;bottom:0;display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;-webkit-box-align:center;-webkit-align-items:center;-moz-box-align:center;-ms-flex-align:center;align-items:center;-webkit-box-pack:center;-webkit-justify-content:center;-moz-box-pack:center;-ms-flex-pack:center;justify-content:center;font-size:2em}.online-prestige__loader{position:absolute;top:50%;left:50%;width:2em;height:2em;margin-left:-1em;margin-top:-1em;background:url(./img/loader.svg) no-repeat center center;-webkit-background-size:contain;-moz-background-size:contain;-o-background-size:contain;background-size:contain}.online-prestige__head,.online-prestige__footer{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;-webkit-box-pack:justify;-webkit-justify-content:space-between;-moz-box-pack:justify;-ms-flex-pack:justify;justify-content:space-between;-webkit-box-align:center;-webkit-align-items:center;-moz-box-align:center;-ms-flex-align:center;align-items:center}.online-prestige__timeline{margin:.8em 0}.online-prestige__timeline>.time-line{display:block !important}.online-prestige__title{font-size:1.7em;overflow:hidden;-o-text-overflow:ellipsis;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;line-clamp:1;-webkit-box-orient:vertical}@media screen and (max-width:480px){.online-prestige__title{font-size:1.4em}}.online-prestige__time{padding-left:2em}.online-prestige__info{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;-webkit-box-align:center;-webkit-align-items:center;-moz-box-align:center;-ms-flex-align:center;align-items:center}.online-prestige__info>*{overflow:hidden;-o-text-overflow:ellipsis;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;line-clamp:1;-webkit-box-orient:vertical}.online-prestige__quality{padding-left:1em;white-space:nowrap}.online-prestige__scan-file{position:absolute;bottom:0;left:0;right:0}.online-prestige__scan-file .broadcast__scan{margin:0}.online-prestige .online-prestige-split{font-size:.8em;margin:0 1em;-webkit-flex-shrink:0;-ms-flex-negative:0;flex-shrink:0}.online-prestige.focus::after{content:'';position:absolute;top:-0.6em;left:-0.6em;right:-0.6em;bottom:-0.6em;-webkit-border-radius:.7em;-moz-border-radius:.7em;border-radius:.7em;border:solid .3em #fff;z-index:-1;pointer-events:none}.online-prestige+.online-prestige{margin-top:1.5em}.online-prestige--folder .online-prestige__footer{margin-top:.8em}.online-prestige-watched{padding:1em}.online-prestige-watched__icon>svg{width:1.5em;height:1.5em}.online-prestige-watched__body{padding-left:1em;padding-top:.1em;display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;-webkit-flex-wrap:wrap;-ms-flex-wrap:wrap;flex-wrap:wrap}.online-prestige-watched__body>span+span::before{content:' ● ';vertical-align:top;display:inline-block;margin:0 .5em}.online-prestige-rate{display:-webkit-inline-box;display:-webkit-inline-flex;display:-moz-inline-box;display:-ms-inline-flexbox;display:inline-flex;-webkit-box-align:center;-webkit-align-items:center;-moz-box-align:center;-ms-flex-align:center;align-items:center}.online-prestige-rate>svg{width:1.3em !important;height:1.3em !important}.online-prestige-rate>span{font-weight:600;font-size:1.1em;padding-left:.7em}.online-empty{line-height:1.4}.online-empty__title{font-size:2em;margin-bottom:.9em}.online-empty__time{font-size:1.2em;font-weight:300;margin-bottom:1.6em}.online-empty__buttons{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex}.online-empty__buttons>*+*{margin-left:1em}.online-empty__button{background:rgba(0,0,0,0.3);font-size:1.2em;padding:.5em 1.2em;-webkit-border-radius:.2em;-moz-border-radius:.2em;border-radius:.2em;margin-bottom:2.4em}.online-empty__button.focus{background:#fff;color:black}.online-empty__templates .online-empty-template:nth-child(2){opacity:.5}.online-empty__templates .online-empty-template:nth-child(3){opacity:.2}.online-empty-template{background-color:rgba(255,255,255,0.3);padding:1em;display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;-webkit-box-align:center;-webkit-align-items:center;-moz-box-align:center;-ms-flex-align:center;align-items:center;-webkit-border-radius:.3em;-moz-border-radius:.3em;border-radius:.3em}.online-empty-template>*{background:rgba(0,0,0,0.3);-webkit-border-radius:.3em;-moz-border-radius:.3em;border-radius:.3em}.online-empty-template__ico{width:4em;height:4em;margin-right:2.4em}.online-empty-template__body{height:1.7em;width:70%}.online-empty-template+.online-empty-template{margin-top:1em}\n        </style>\n    ");
+    $('body').append(Lampa.Template.get('online_prestige_css', {}, true));
+
+    function resetTemplates() {
+      Lampa.Template.add('online_prestige_full', "<div class=\"online-prestige online-prestige--full selector\">\n            <div class=\"online-prestige__img\">\n                <img alt=\"\">\n                <div class=\"online-prestige__loader\"></div>\n            </div>\n            <div class=\"online-prestige__body\">\n                <div class=\"online-prestige__head\">\n                    <div class=\"online-prestige__title\">{title}</div>\n                    <div class=\"online-prestige__time\">{time}</div>\n                </div>\n\n                <div class=\"online-prestige__timeline\"></div>\n\n                <div class=\"online-prestige__footer\">\n                    <div class=\"online-prestige__info\">{info}</div>\n                    <div class=\"online-prestige__quality\">{quality}</div>\n                </div>\n            </div>\n        </div>");
+      Lampa.Template.add('online_does_not_answer', "<div class=\"online-empty\">\n            <div class=\"online-empty__title\" style=\"font-size: 2em; margin-bottom: .9em;\">\n                #{online_balanser_dont_work}\n            </div>\n          <div class=\"online-empty__templates\">\n                <div class=\"online-empty-template\">\n                    <div class=\"online-empty-template__ico\"></div>\n                    <div class=\"online-empty-template__body\"></div>\n                </div>\n                <div class=\"online-empty-template\">\n                    <div class=\"online-empty-template__ico\"></div>\n                    <div class=\"online-empty-template__body\"></div>\n                </div>\n                <div class=\"online-empty-template\">\n                    <div class=\"online-empty-template__ico\"></div>\n                    <div class=\"online-empty-template__body\"></div>\n                </div>\n            </div>\n        </div>");
+      Lampa.Template.add('online_prestige_rate', "<div class=\"online-prestige-rate\">\n            <svg width=\"17\" height=\"16\" viewBox=\"0 0 17 16\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n                <path d=\"M8.39409 0.192139L10.99 5.30994L16.7882 6.20387L12.5475 10.4277L13.5819 15.9311L8.39409 13.2425L3.20626 15.9311L4.24065 10.4277L0 6.20387L5.79819 5.30994L8.39409 0.192139Z\" fill=\"#fff\"></path>\n            </svg>\n            <span>{rate}</span>\n        </div>");
+      Lampa.Template.add('online_prestige_folder', "<div class=\"online-prestige online-prestige--folder selector\">\n            <div class=\"online-prestige__folder\">\n                <svg viewBox=\"0 0 128 112\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n                    <rect y=\"20\" width=\"128\" height=\"92\" rx=\"13\" fill=\"white\"></rect>\n                    <path d=\"M29.9963 8H98.0037C96.0446 3.3021 91.4079 0 86 0H42C36.5921 0 31.9555 3.3021 29.9963 8Z\" fill=\"white\" fill-opacity=\"0.23\"></path>\n                    <rect x=\"11\" y=\"8\" width=\"106\" height=\"76\" rx=\"13\" fill=\"white\" fill-opacity=\"0.51\"></rect>\n                </svg>\n            </div>\n            <div class=\"online-prestige__body\">\n                <div class=\"online-prestige__head\">\n                    <div class=\"online-prestige__title\">{title}</div>\n                    <div class=\"online-prestige__time\">{time}</div>\n                </div>\n\n                <div class=\"online-prestige__footer\">\n                    <div class=\"online-prestige__info\">{info}</div>\n                </div>\n            </div>\n        </div>");
+    }
+
+    var button = "<div class=\"full-start__button selector view--online\" data-subtitle=\"Kinogo v".concat(manifest.version, "\">\n        <svg width=\"135\" height=\"147\" viewBox=\"0 0 135 147\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\">\n            <path d=\"M121.5 96.8823C139.5 86.49 139.5 60.5092 121.5 50.1169L41.25 3.78454C23.25 -6.60776 0.750004 6.38265 0.750001 27.1673L0.75 51.9742C4.70314 35.7475 23.6209 26.8138 39.0547 35.7701L94.8534 68.1505C110.252 77.0864 111.909 97.8693 99.8725 109.369L121.5 96.8823Z\" fill=\"currentColor\"/>\n            <path d=\"M63 84.9836C80.3333 94.991 80.3333 120.01 63 130.017L39.75 143.44C22.4167 153.448 0.749999 140.938 0.75 120.924L0.750001 94.0769C0.750002 74.0621 22.4167 61.5528 39.75 71.5602L63 84.9836Z\" fill=\"currentColor\"/>\n        </svg>\n\n        <span>#{title_online}</span>\n    </div>");
+
+    Lampa.Component.add('online_kinogo', component);
+
+    resetTemplates();
+    Lampa.Listener.follow('full', function(e) {
+      if (e.type == 'complite') {
+        var btn = $(Lampa.Lang.translate(button));
+        btn.on('hover:enter', function() {
+          resetTemplates();
+          Lampa.Component.add('online_kinogo', component);
+          Lampa.Activity.push({
+            url: '',
+            title: Lampa.Lang.translate('title_online'),
+            component: 'online_kinogo',
+            search: e.data.movie.title,
+            search_one: e.data.movie.title,
+            search_two: e.data.movie.original_title,
+            movie: e.data.movie,
+            page: 1
+          });
+        });
+        e.object.activity.render().find('.view--torrent').after(btn);
+      }
+    });
+
+    window.kinogo = {
+      max_qualitie: 1080,
+      is_max_qualitie: false
+    };
+
+    if (Lampa.Manifest.app_digital >= 177) {
+      Lampa.Storage.sync('online_choice_kinogo', 'object_object');
+    }
+  }
+
+  if (!window.online_kinogo && Lampa.Manifest.app_digital >= 155) startPlugin();
+
+})();
