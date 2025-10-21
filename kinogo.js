@@ -60,7 +60,7 @@
       
       // Поиск iframe с видео
       var iframe = doc.querySelector('#news-id iframe');
-      if (iframe) {
+      if (iframe && iframe.src) {
         result.player_links.movie.push({
           link: iframe.src,
           translation: 'Оригинал'
@@ -73,10 +73,21 @@
         var videoLinks = player.querySelectorAll('a[data-link]');
         videoLinks.forEach(function(link) {
           var videoUrl = link.getAttribute('data-link');
-          if (videoUrl && videoUrl.includes('//')) {
+          if (videoUrl && (videoUrl.includes('//') || videoUrl.includes('http'))) {
             result.player_links.movie.push({
               link: videoUrl,
               translation: 'Плеер ' + (index + 1)
+            });
+          }
+        });
+        
+        // Также ищем прямые iframe внутри плееров
+        var innerIframes = player.querySelectorAll('iframe');
+        innerIframes.forEach(function(iframe, iframeIndex) {
+          if (iframe.src && iframe.src.includes('//')) {
+            result.player_links.movie.push({
+              link: iframe.src,
+              translation: 'Iframe ' + (index + 1)
             });
           }
         });
@@ -101,16 +112,16 @@
       var orig = object.movie.original_name || object.movie.original_title;
       
       // Формируем данные для поиска
-      var formData = new FormData();
-      formData.append('do', 'search');
-      formData.append('subaction', 'search');
-      formData.append('story', query);
+      var formData = "do=search&subaction=search&story=" + encodeURIComponent(query);
       
       network.clear();
       network.timeout(15000);
       
       network.native(search_url, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
         body: formData
       }, function(html) {
         try {
@@ -124,8 +135,9 @@
           });
 
           if (!card && cards.length == 1) card = cards[0];
-          if (card) _this.find(card.id, card.url);
-          else if (searchResults.length) {
+          if (card) {
+            _this.find(card.id, card.url);
+          } else if (searchResults.length) {
             wait_similars = true;
             component.similars(searchResults);
             component.loading(false);
@@ -133,9 +145,11 @@
             component.doesNotAnswer();
           }
         } catch (e) {
+          console.error('Parse error:', e);
           component.doesNotAnswer();
         }
       }, function(a, c) {
+        console.error('Network error:', a, c);
         component.doesNotAnswer();
       });
     };
@@ -155,9 +169,11 @@
             component.doesNotAnswer();
           }
         } catch (e) {
+          console.error('Parse movie error:', e);
           component.doesNotAnswer();
         }
       }, function(a, c) {
+        console.error('Network movie error:', a, c);
         component.doesNotAnswer();
       });
     };
@@ -233,7 +249,7 @@
           extract[index + 1] = {
             file: movie.link,
             translation: movie.translation || 'Перевод ' + (index + 1),
-            quality: 1080 // Kinogo обычно в хорошем качестве
+            quality: 1080
           };
         });
       }
@@ -1101,7 +1117,7 @@
     window.online_kinogo = true;
     var manifest = {
       type: 'video',
-      version: '1.0.0',
+      version: '1.0.1',
       name: 'Онлайн - Kinogo',
       description: 'Плагин для просмотра онлайн сериалов и фильмов с Kinogo.ec',
       component: 'online_kinogo',
@@ -1129,7 +1145,7 @@
     
     Lampa.Manifest.plugins = manifest;
     
-    // Добавляем переводы если их нет
+    // Добавляем все необходимые переводы
     var translations = {
       online_watch: {
         ru: 'Смотреть онлайн',
@@ -1160,6 +1176,144 @@
         uk: 'Онлайн',
         en: 'Online',
         zh: '在线的'
+      },
+      online_balanser_dont_work: {
+        ru: 'Поиск не дал результатов',
+        uk: 'Пошук не дав результатів',
+        en: 'The search did not return any results',
+        zh: '搜索没有返回任何结果'
+      },
+      empty_title_two: {
+        ru: 'Ничего не найдено',
+        uk: 'Нічого не знайдено',
+        en: 'Nothing found',
+        zh: '没有找到任何内容'
+      },
+      torrent_parser_reset: {
+        ru: 'Сбросить',
+        uk: 'Скинути',
+        en: 'Reset',
+        zh: '重置'
+      },
+      torrent_parser_voice: {
+        ru: 'Озвучка',
+        uk: 'Озвучення',
+        en: 'Voice',
+        zh: '配音'
+      },
+      torrent_serial_season: {
+        ru: 'Сезон',
+        uk: 'Сезон',
+        en: 'Season',
+        zh: '季节'
+      },
+      title_filter: {
+        ru: 'Фильтр',
+        uk: 'Фільтр',
+        en: 'Filter',
+        zh: '筛选'
+      },
+      player_lauch: {
+        ru: 'Запустить в',
+        uk: 'Запустити в',
+        en: 'Launch in',
+        zh: '启动在'
+      },
+      torrent_parser_label_title: {
+        ru: 'Отметить просмотренным',
+        uk: 'Позначити переглянутим',
+        en: 'Mark as watched',
+        zh: '标记为已观看'
+      },
+      torrent_parser_label_cancel_title: {
+        ru: 'Снять отметку',
+        uk: 'Зняти позначку',
+        en: 'Remove mark',
+        zh: '移除标记'
+      },
+      time_reset: {
+        ru: 'Сбросить время',
+        uk: 'Скинути час',
+        en: 'Reset time',
+        zh: '重置时间'
+      },
+      copy_link: {
+        ru: 'Скопировать ссылку',
+        uk: 'Скопіювати посилання',
+        en: 'Copy link',
+        zh: '复制链接'
+      },
+      more: {
+        ru: 'Еще',
+        uk: 'Ще',
+        en: 'More',
+        zh: '更多'
+      },
+      online_voice_subscribe: {
+        ru: 'Подписаться на перевод',
+        uk: 'Підписатися на переклад',
+        en: 'Subscribe to translation',
+        zh: '订阅翻译'
+      },
+      online_voice_success: {
+        ru: 'Вы успешно подписались',
+        uk: 'Ви успішно підписалися',
+        en: 'You have successfully subscribed',
+        zh: '您已成功订阅'
+      },
+      online_voice_error: {
+        ru: 'Возникла ошибка',
+        uk: 'Виникла помилка',
+        en: 'An error has occurred',
+        zh: '发生了错误'
+      },
+      online_clear_all_marks: {
+        ru: 'Очистить все метки',
+        uk: 'Очистити всі мітки',
+        en: 'Clear all labels',
+        zh: '清除所有标签'
+      },
+      online_clear_all_timecodes: {
+        ru: 'Очистить все тайм-коды',
+        uk: 'Очистити всі тайм-коди',
+        en: 'Clear all timecodes',
+        zh: '清除所有时间代码'
+      },
+      title_action: {
+        ru: 'Действия',
+        uk: 'Дії',
+        en: 'Actions',
+        zh: '操作'
+      },
+      settings_server_links: {
+        ru: 'Ссылки на видео',
+        uk: 'Посилання на відео',
+        en: 'Video links',
+        zh: '视频链接'
+      },
+      copy_secuses: {
+        ru: 'Скопировано',
+        uk: 'Скопійовано',
+        en: 'Copied',
+        zh: '已复制'
+      },
+      copy_error: {
+        ru: 'Ошибка копирования',
+        uk: 'Помилка копіювання',
+        en: 'Copy error',
+        zh: '复制错误'
+      },
+      settings_rest_source: {
+        ru: 'Источник',
+        uk: 'Джерело',
+        en: 'Source',
+        zh: '源'
+      },
+      full_episode_days_left: {
+        ru: 'Выход через',
+        uk: 'Вихід через',
+        en: 'Release in',
+        zh: '发布在'
       }
     };
     
@@ -1280,4 +1434,4 @@
   if (!window.online_kinogo && Lampa.Manifest.app_digital >= 155) startPlugin();
 
 })();
-// V3
+// V3.1
