@@ -11,19 +11,18 @@
 
             console.log('Kinogo search for:', query);
 
-            // Создаем простой результат с тестовыми ссылками
-            // В реальной реализации здесь должен быть парсинг Kinogo
+            // Создаем mock результаты с тестовыми видео
             var mockResults = {
                 player_links: {
                     movie: [
                         {
                             link: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4',
-                            translation: 'Тестовое видео 1',
+                            translation: 'Тестовое видео 1 (720p)',
                             quality: 720
                         },
                         {
-                            link: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4',
-                            translation: 'Тестовое видео 2',
+                            link: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/1080/Big_Buck_Bunny_1080_10s_5MB.mp4', 
+                            translation: 'Тестовое видео 2 (1080p)',
                             quality: 1080
                         }
                     ],
@@ -33,41 +32,20 @@
 
             // Имитируем загрузку
             setTimeout(function() {
-                success(mockResults);
+                _this.success(mockResults);
                 component.loading(false);
-            }, 1000);
+            }, 500);
         };
 
-        this.find = function(kinogo_id, kinogo_url) {
-            // Используем searchByTitle для поиска
-            this.searchByTitle(object, object.movie.title);
-        };
-
-        this.extendChoice = function(saved) {
-            // Пустая реализация
-        };
-
-        this.reset = function() {
-            component.reset();
-        };
-
-        this.filter = function(type, a, b) {
-            // Пустая реализация
-        };
-
-        this.destroy = function() {
-            network.clear();
-        };
-
-        function success(json) {
+        this.success = function(json) {
             var extract = {};
             
             if (json.player_links.movie && json.player_links.movie.length > 0) {
                 json.player_links.movie.forEach(function(movie, index) {
                     extract[index + 1] = {
                         file: movie.link,
-                        translation: movie.translation || 'Источник ' + (index + 1),
-                        quality: movie.quality || 720
+                        translation: movie.translation,
+                        quality: movie.quality
                     };
                 });
             }
@@ -79,68 +57,62 @@
                     title: element.translation,
                     quality: (element.quality || 720) + 'p',
                     translation: parseInt(transl_id),
-                    voice_name: element.translation
+                    voice_name: element.translation,
+                    file: element.file
                 });
             }
 
-            append(filtred);
-        }
-
-        function append(items) {
-            component.reset();
-            component.draw(items, {
-                onEnter: function onEnter(item) {
+            component.draw(filtred, {
+                onEnter: function(item) {
+                    console.log('Playing:', item.file);
                     var play = {
                         title: item.title,
-                        url: getVideoUrl(item),
-                        quality: { '720p': getVideoUrl(item) }
+                        url: item.file,
+                        quality: { '720p': item.file }
                     };
                     
-                    if (play.url) {
-                        Lampa.Player.play(play);
-                    } else {
-                        Lampa.Noty.show('Ссылка на видео не найдена');
-                    }
+                    Lampa.Player.play(play);
                 }
             });
-        }
+        };
 
-        function getVideoUrl(item) {
-            // Возвращаем тестовые видео URL
-            if (item.translation === 1) {
-                return 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_1MB.mp4';
-            } else {
-                return 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4';
-            }
-        }
+        this.find = function() {
+            this.searchByTitle(object, object.movie.title);
+        };
+
+        this.extendChoice = function() {};
+        this.reset = function() {};
+        this.filter = function() {};
+        this.destroy = function() {
+            network.clear();
+        };
     }
 
     function component(object) {
+        var self = this;
         var network = new Lampa.Reguest();
         var scroll = new Lampa.Scroll({ mask: true, over: true });
-        var files = new Lampa.Explorer(object);
         var source = new kinogo(this, object);
         var initialized = false;
-
-        this.initialize = function() {
-            files.appendFiles(scroll.render());
-            scroll.body().addClass('torrent-list');
-            this.search();
-        };
 
         this.create = function() {
             return this.render();
         };
 
+        this.render = function() {
+            return scroll.render();
+        };
+
+        this.initialize = function() {
+            this.search();
+        };
+
         this.search = function() {
             this.activity.loader(true);
-            if (source.searchByTitle) {
-                source.searchByTitle(object, object.search || object.movie.original_title || object.movie.title);
-            }
+            source.searchByTitle(object, object.search || object.movie.original_title || object.movie.title);
         };
 
         this.reset = function() {
-            network.clear();
             scroll.clear();
         };
 
@@ -159,108 +131,105 @@
                 return;
             }
             
-            var viewed = Lampa.Storage.cache('online_view', 5000, []);
+            console.log('Drawing items:', items);
             
-            items.forEach(function(element) {
-                var hash_behold = Lampa.Utils.hash(object.movie.original_title + element.voice_name);
-                
+            this.reset();
+            
+            items.forEach(function(element, index) {
                 var html = Lampa.Template.get('online_prestige_full', {
                     title: element.title,
                     quality: element.quality,
                     time: Lampa.Utils.secondsToTime((object.movie.runtime || 120) * 60, true),
-                    info: element.voice_name || 'Kinogo'
+                    info: 'Kinogo Demo'
                 });
 
-                // Добавляем постер если есть
+                // Добавляем постер
                 var image = html.find('.online-prestige__img');
-                if (image.length > 0 && object.movie.backdrop_path) {
+                if (image.length > 0) {
                     var img = image.find('img')[0];
-                    if (img) {
-                        img.onerror = function() {
-                            img.src = './img/img_broken.svg';
-                        };
+                    if (img && object.movie.backdrop_path) {
                         img.onload = function() {
                             image.addClass('online-prestige__img--loaded');
                             image.find('.online-prestige__loader').remove();
                         };
+                        img.onerror = function() {
+                            image.find('.online-prestige__loader').remove();
+                        };
                         img.src = Lampa.TMDB.image('t/p/w300' + object.movie.backdrop_path);
+                    } else {
+                        image.find('.online-prestige__loader').remove();
                     }
                 }
 
-                // Отметка о просмотренном
-                if (viewed.indexOf(hash_behold) !== -1) {
-                    html.find('.online-prestige__img').append('<div class="online-prestige__viewed">' + Lampa.Template.get('icon_viewed', {}, true) + '</div>');
-                }
-
                 html.on('hover:enter', function() {
-                    if (object.movie.id) Lampa.Favorite.add('history', object.movie, 100);
                     if (params && params.onEnter) {
                         params.onEnter(element, html);
                     }
                 });
-                
+
                 scroll.append(html);
             });
-            
+
             this.loading(false);
-            
-            // Включаем управление
-            Lampa.Controller.add('content', {
-                toggle: function() {
-                    Lampa.Controller.collectionSet(scroll.render(), scroll.render());
-                    if (items.length > 0) {
-                        Lampa.Controller.collectionFocus(scroll.render().find('.selector').first()[0], scroll.render());
-                    }
-                },
-                up: function() {
-                    if (Lampa.Controller.can('up')) Lampa.Controller.run('up');
-                    else Lampa.Controller.toggle('head');
-                },
-                down: function() {
-                    if (Lampa.Controller.can('down')) Lampa.Controller.run('down');
-                },
-                left: function() {
-                    if (Lampa.Controller.can('left')) Lampa.Controller.run('left');
-                    else Lampa.Controller.toggle('menu');
-                },
-                right: function() {
-                    if (Lampa.Controller.can('right')) Lampa.Controller.run('right');
-                },
-                back: function() {
-                    Lampa.Activity.backward();
-                }
-            });
-            
-            Lampa.Controller.toggle('content');
+            this.start();
         };
 
         this.empty = function() {
             var html = Lampa.Template.get('online_does_not_answer', {});
             scroll.append(html);
             this.loading(false);
+            this.start();
         };
 
         this.doesNotAnswer = function() {
-            this.reset();
-            var html = Lampa.Template.get('online_does_not_answer', {
-                balanser: 'kinogo'
-            });
-            scroll.append(html);
-            this.loading(false);
+            this.empty();
         };
 
         this.start = function() {
             if (!initialized) {
                 initialized = true;
-                this.initialize();
+                
+                Lampa.Background.immediately(Lampa.Utils.cardImgBackgroundBlur(object.movie));
+                
+                Lampa.Controller.add('content', {
+                    toggle: function() {
+                        Lampa.Controller.collectionSet(scroll.render(), scroll.render());
+                        var firstItem = scroll.render().find('.selector').first();
+                        if (firstItem.length > 0) {
+                            Lampa.Controller.collectionFocus(firstItem[0], scroll.render());
+                        }
+                    },
+                    up: function() {
+                        if (Lampa.Controller.can('up')) {
+                            Lampa.Controller.run('up');
+                        } else {
+                            Lampa.Controller.toggle('head');
+                        }
+                    },
+                    down: function() {
+                        if (Lampa.Controller.can('down')) {
+                            Lampa.Controller.run('down');
+                        }
+                    },
+                    left: function() {
+                        if (Lampa.Controller.can('left')) {
+                            Lampa.Controller.run('left');
+                        } else {
+                            Lampa.Controller.toggle('menu');
+                        }
+                    },
+                    right: function() {
+                        if (Lampa.Controller.can('right')) {
+                            Lampa.Controller.run('right');
+                        }
+                    },
+                    back: function() {
+                        Lampa.Activity.backward();
+                    }
+                });
             }
-
-            Lampa.Background.immediately(Lampa.Utils.cardImgBackgroundBlur(object.movie));
+            
             Lampa.Controller.toggle('content');
-        };
-
-        this.render = function() {
-            return scroll.render();
         };
 
         this.back = function() {
@@ -269,7 +238,7 @@
 
         this.destroy = function() {
             network.clear();
-            if (source.destroy) source.destroy();
+            source.destroy();
         };
     }
 
@@ -279,21 +248,20 @@
 
         var manifest = {
             type: 'video',
-            version: '1.0.0',
+            version: '1.0.1',
             name: 'Онлайн - Kinogo',
-            description: 'Плагин для просмотра фильмов (тестовый)',
+            description: 'Демо плагин для тестирования',
             component: 'online_kinogo',
             onContextMenu: function(object) {
                 return {
-                    name: 'Смотреть на Kinogo',
-                    description: 'Тестовый плагин'
+                    name: 'Смотреть (демо)',
+                    description: 'Тестовые видео'
                 };
             },
             onContextLauch: function(object) {
-                Lampa.Component.add('online_kinogo', component);
                 Lampa.Activity.push({
                     url: '',
-                    title: 'Kinogo',
+                    title: 'Kinogo Demo',
                     component: 'online_kinogo',
                     movie: object
                 });
@@ -301,105 +269,96 @@
         };
 
         // Добавляем переводы
-        Lampa.Lang.add({
-            online_balanser_dont_work: {
-                ru: 'Демонстрационный режим. Используются тестовые видео.',
-                en: 'Demo mode. Using test videos.'
-            },
-            online_watch: {
-                ru: 'Смотреть (тест)',
-                en: 'Watch (test)'
-            },
-            title_online: {
-                ru: 'Kinogo Тест',
-                en: 'Kinogo Test'
-            },
-            online_nolink: {
-                ru: 'Ссылка не найдена',
-                en: 'Link not found'
-            }
-        });
+        if (!Lampa.Lang.translate('online_watch')) {
+            Lampa.Lang.add({
+                online_watch: {
+                    ru: 'Смотреть (демо)',
+                    en: 'Watch (demo)'
+                },
+                title_online: {
+                    ru: 'Kinogo Demo',
+                    en: 'Kinogo Demo'
+                },
+                online_balanser_dont_work: {
+                    ru: 'Демонстрационный режим',
+                    en: 'Demo mode'
+                }
+            });
+        }
 
-        // Добавляем CSS стили
-        Lampa.Template.add('online_prestige_css', `
-            <style>
-            .online-prestige {
-                position: relative;
-                border-radius: 8px;
-                background: rgba(0,0,0,0.3);
-                display: flex;
-                margin: 10px 0;
-                padding: 15px;
-            }
-            .online-prestige__img {
-                position: relative;
-                width: 120px;
-                height: 80px;
-                flex-shrink: 0;
-                margin-right: 15px;
-                border-radius: 6px;
-                overflow: hidden;
-                background: #333;
-            }
-            .online-prestige__img img {
-                width: 100%;
-                height: 100%;
-                object-fit: cover;
-                opacity: 0;
-                transition: opacity 0.3s;
-            }
-            .online-prestige__img--loaded img {
-                opacity: 1;
-            }
-            .online-prestige__loader {
-                position: absolute;
-                top: 50%;
-                left: 50%;
-                width: 20px;
-                height: 20px;
-                margin: -10px 0 0 -10px;
-                background: url(./img/loader.svg) no-repeat center center;
-                background-size: contain;
-            }
-            .online-prestige__body {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-            }
-            .online-prestige__title {
-                font-size: 16px;
-                font-weight: bold;
-                margin-bottom: 5px;
-            }
-            .online-prestige__info {
-                font-size: 14px;
-                color: #aaa;
-                margin-bottom: 5px;
-            }
-            .online-prestige__quality {
-                font-size: 14px;
-                color: #4CAF50;
-            }
-            .online-prestige__viewed {
-                position: absolute;
-                top: 5px;
-                left: 5px;
-                background: rgba(0,0,0,0.7);
-                border-radius: 50%;
-                padding: 3px;
-            }
-            .online-prestige__viewed svg {
-                width: 16px;
-                height: 16px;
-            }
-            .online-prestige.selector.focus {
-                background: rgba(255,255,255,0.1);
-                transform: scale(1.02);
-            }
-            </style>
-        `);
-        $('body').append(Lampa.Template.get('online_prestige_css', {}, true));
+        // Добавляем CSS
+        if (!$('#kinogo-css').length) {
+            $('head').append(`
+                <style id="kinogo-css">
+                .online-prestige {
+                    position: relative;
+                    border-radius: 8px;
+                    background: rgba(0,0,0,0.3);
+                    display: flex;
+                    margin: 10px 0;
+                    padding: 15px;
+                    min-height: 100px;
+                }
+                .online-prestige__img {
+                    position: relative;
+                    width: 120px;
+                    height: 80px;
+                    flex-shrink: 0;
+                    margin-right: 15px;
+                    border-radius: 6px;
+                    overflow: hidden;
+                    background: #222;
+                }
+                .online-prestige__img img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                }
+                .online-prestige__img--loaded img {
+                    opacity: 1;
+                }
+                .online-prestige__loader {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    width: 20px;
+                    height: 20px;
+                    margin: -10px 0 0 -10px;
+                    background: url(./img/loader.svg) no-repeat center center;
+                    background-size: contain;
+                }
+                .online-prestige__body {
+                    flex: 1;
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: center;
+                }
+                .online-prestige__title {
+                    font-size: 16px;
+                    font-weight: bold;
+                    margin-bottom: 5px;
+                }
+                .online-prestige__info {
+                    font-size: 14px;
+                    color: #aaa;
+                    margin-bottom: 5px;
+                }
+                .online-prestige__quality {
+                    font-size: 14px;
+                    color: #4CAF50;
+                }
+                .online-prestige.selector.focus {
+                    background: rgba(255,255,255,0.1);
+                    transform: scale(1.02);
+                }
+                .view--online {
+                    margin: 5px 0;
+                }
+                </style>
+            `);
+        }
 
         // Добавляем шаблоны
         Lampa.Template.add('online_prestige_full', `
@@ -419,21 +378,18 @@
         Lampa.Template.add('online_does_not_answer', `
             <div style="text-align: center; padding: 40px; color: #aaa;">
                 <div style="font-size: 20px; margin-bottom: 20px;">#{online_balanser_dont_work}</div>
-                <div>Это демонстрационная версия плагина</div>
+                <div>Используются тестовые видеофайлы</div>
             </div>
         `);
 
-        Lampa.Template.add('icon_viewed', `
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M21 7L9 19L3.5 13.5L4.91 12.09L9 16.17L19.59 5.59L21 7Z"/>
-            </svg>
-        `);
+        // Регистрируем компонент
+        Lampa.Component.add('online_kinogo', component);
 
         // Добавляем кнопку в интерфейс
         Lampa.Listener.follow('full', function(e) {
             if (e.type == 'complite') {
                 var buttonHtml = `
-                    <div class="full-start__button selector view--online" data-subtitle="Kinogo Test">
+                    <div class="full-start__button selector view--online" data-subtitle="Demo">
                         <div style="display: flex; align-items: center; padding: 12px; background: rgba(0,0,0,0.3); border-radius: 8px; margin: 5px 0;">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 10px;">
                                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>
@@ -445,7 +401,6 @@
                 
                 var btn = $(Lampa.Lang.translate(buttonHtml));
                 btn.on('hover:enter', function() {
-                    Lampa.Component.add('online_kinogo', component);
                     Lampa.Activity.push({
                         url: '',
                         title: Lampa.Lang.translate('title_online'),
@@ -454,23 +409,23 @@
                     });
                 });
                 
+                // Добавляем кнопку после торрент кнопки
                 var torrentBtn = e.object.activity.render().find('.view--torrent');
                 if (torrentBtn.length) {
                     torrentBtn.after(btn);
                 } else {
+                    // Если нет торрент кнопки, добавляем в контейнер
                     e.object.activity.render().find('.full-start__buttons').append(btn);
                 }
             }
         });
 
         Lampa.Manifest.plugins = manifest;
-        Lampa.Component.add('online_kinogo', component);
     }
 
     // Запускаем плагин
     if (Lampa.Manifest.app_digital >= 155) {
-        // Ждем загрузки Lampa
-        if (window.Lampa) {
+        if (window.Lampa && window.Lampa.Manifest) {
             startPlugin();
         } else {
             document.addEventListener('lampa_start', startPlugin);
@@ -478,4 +433,4 @@
     }
 
 })();
-// Test
+// тест 2
