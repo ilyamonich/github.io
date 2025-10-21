@@ -499,7 +499,7 @@
     }
   }
 
-  // Остальная часть кода component остается такой же как в предыдущем варианте
+  // Компонент для отображения интерфейса
   function component(object) {
     var network = new Lampa.Reguest();
     var scroll = new Lampa.Scroll({
@@ -1058,7 +1058,7 @@
     window.online_kinogo = true;
     var manifest = {
       type: 'video',
-      version: '1.0.2',
+      version: '1.0.3',
       name: 'Онлайн - Kinogo',
       description: 'Плагин для просмотра онлайн сериалов и фильмов с Kinogo.ec',
       component: 'online_kinogo',
@@ -1093,6 +1093,120 @@
         uk: 'Нічого не знайдено на Kinogo',
         en: 'Nothing found on Kinogo',
         zh: '在 Kinogo 上找不到任何内容'
+      },
+      online_watch: {
+        ru: 'Смотреть онлайн',
+        en: 'Watch online', 
+        ua: 'Дивитися онлайн',
+        zh: '在线观看'
+      },
+      title_online: {
+        ru: 'Онлайн',
+        uk: 'Онлайн',
+        en: 'Online',
+        zh: '在线的'
+      },
+      online_nolink: {
+        ru: 'Не удалось извлечь ссылку',
+        uk: 'Неможливо отримати посилання',
+        en: 'Failed to fetch link',
+        zh: '获取链接失败'
+      },
+      torrent_parser_reset: {
+        ru: 'Сбросить',
+        uk: 'Скинути',
+        en: 'Reset',
+        zh: '重置'
+      },
+      torrent_parser_voice: {
+        ru: 'Озвучка',
+        uk: 'Озвучення',
+        en: 'Voice',
+        zh: '配音'
+      },
+      torrent_serial_season: {
+        ru: 'Сезон',
+        uk: 'Сезон',
+        en: 'Season',
+        zh: '季节'
+      },
+      title_filter: {
+        ru: 'Фильтр',
+        uk: 'Фільтр',
+        en: 'Filter',
+        zh: '筛选'
+      },
+      player_lauch: {
+        ru: 'Запустить в',
+        uk: 'Запустити в',
+        en: 'Launch in',
+        zh: '启动在'
+      },
+      online_video: {
+        ru: 'Видео',
+        en: 'Video',
+        ua: 'Відео',
+        zh: '视频'
+      },
+      torrent_parser_label_title: {
+        ru: 'Отметить просмотренным',
+        uk: 'Позначити переглянутим',
+        en: 'Mark as watched',
+        zh: '标记为已观看'
+      },
+      torrent_parser_label_cancel_title: {
+        ru: 'Снять отметку',
+        uk: 'Зняти позначку',
+        en: 'Remove mark',
+        zh: '移除标记'
+      },
+      time_reset: {
+        ru: 'Сбросить время',
+        uk: 'Скинути час',
+        en: 'Reset time',
+        zh: '重置时间'
+      },
+      copy_link: {
+        ru: 'Скопировать ссылку',
+        uk: 'Скопіювати посилання',
+        en: 'Copy link',
+        zh: '复制链接'
+      },
+      title_action: {
+        ru: 'Действия',
+        uk: 'Дії',
+        en: 'Actions',
+        zh: '操作'
+      },
+      copy_secuses: {
+        ru: 'Скопировано',
+        uk: 'Скопійовано',
+        en: 'Copied',
+        zh: '已复制'
+      },
+      copy_error: {
+        ru: 'Ошибка копирования',
+        uk: 'Помилка копіювання',
+        en: 'Copy error',
+        zh: '复制错误'
+      },
+      helper_online_file: {
+        ru: 'Удерживайте клавишу "ОК" для вызова контекстного меню',
+        uk: 'Утримуйте клавішу "ОК" для виклику контекстного меню',
+        en: 'Hold the "OK" key to bring up the context menu',
+        zh: '按住"确定"键调出上下文菜单'
+      },
+      empty_title_two: {
+        ru: 'Ничего не найдено',
+        uk: 'Нічого не знайдено',
+        en: 'Nothing found',
+        zh: '没有找到任何内容'
+      },
+      settings_rest_source: {
+        ru: 'Источник',
+        uk: 'Джерело',
+        en: 'Source',
+        zh: '源'
       }
     };
     
@@ -1102,19 +1216,142 @@
       }
     }
 
-    // CSS и шаблоны остаются такими же
-    Lampa.Template.add('online_prestige_css', `...`); // тот же CSS что и ранее
+    // Добавляем CSS
+    Lampa.Template.add('online_prestige_css', `
+        <style>
+        .online-prestige{position:relative;border-radius:.3em;background-color:rgba(0,0,0,0.3);display:flex;will-change:transform}
+        .online-prestige__body{padding:1.2em;line-height:1.3;flex-grow:1;position:relative}
+        .online-prestige__img{position:relative;width:13em;flex-shrink:0;min-height:8.2em}
+        .online-prestige__img>img{position:absolute;top:0;left:0;width:100%;height:100%;object-fit:cover;border-radius:.3em;opacity:0;transition:opacity .3s}
+        .online-prestige__img--loaded>img{opacity:1}
+        .online-prestige__folder{padding:1em;flex-shrink:0}
+        .online-prestige__viewed{position:absolute;top:1em;left:1em;background:rgba(0,0,0,0.45);border-radius:100%;padding:.25em;font-size:.76em}
+        .online-prestige__episode-number{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-size:2em}
+        .online-prestige__loader{position:absolute;top:50%;left:50%;width:2em;height:2em;margin-left:-1em;margin-top:-1em;background:url(./img/loader.svg) no-repeat center center;background-size:contain}
+        .online-prestige__head,.online-prestige__footer{display:flex;justify-content:space-between;align-items:center}
+        .online-prestige__timeline{margin:.8em 0}
+        .online-prestige__title{font-size:1.7em;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;line-clamp:1;-webkit-box-orient:vertical}
+        .online-prestige__time{padding-left:2em}
+        .online-prestige__info{display:flex;align-items:center}
+        .online-prestige__info>*{overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:1;line-clamp:1;-webkit-box-orient:vertical}
+        .online-prestige__quality{padding-left:1em;white-space:nowrap}
+        .online-prestige .online-prestige-split{font-size:.8em;margin:0 1em;flex-shrink:0}
+        .online-prestige.focus::after{content:'';position:absolute;top:-0.6em;left:-0.6em;right:-0.6em;bottom:-0.6em;border-radius:.7em;border:solid .3em #fff;z-index:-1;pointer-events:none}
+        .online-prestige+.online-prestige{margin-top:1.5em}
+        .online-prestige--folder .online-prestige__footer{margin-top:.8em}
+        .online-prestige-rate{display:inline-flex;align-items:center}
+        .online-prestige-rate>span{font-weight:600;font-size:1.1em;padding-left:.7em}
+        .online-empty{line-height:1.4}
+        .online-empty__title{font-size:2em;margin-bottom:.9em}
+        .online-empty__buttons{display:flex}
+        .online-empty__buttons>*+*{margin-left:1em}
+        .online-empty__button{background:rgba(0,0,0,0.3);font-size:1.2em;padding:.5em 1.2em;border-radius:.2em;margin-bottom:2.4em}
+        .online-empty__button.focus{background:#fff;color:black}
+        .online-empty__templates .online-empty-template:nth-child(2){opacity:.5}
+        .online-empty__templates .online-empty-template:nth-child(3){opacity:.2}
+        .online-empty-template{background-color:rgba(255,255,255,0.3);padding:1em;display:flex;align-items:center;border-radius:.3em}
+        .online-empty-template>*{background:rgba(0,0,0,0.3);border-radius:.3em}
+        .online-empty-template__ico{width:4em;height:4em;margin-right:2.4em}
+        .online-empty-template__body{height:1.7em;width:70%}
+        .online-empty-template+.online-empty-template{margin-top:1em}
+        </style>
+    `);
     $('body').append(Lampa.Template.get('online_prestige_css', {}, true));
 
     function resetTemplates() {
-      // те же шаблоны что и ранее
+      // Добавляем все необходимые шаблоны
+      Lampa.Template.add('online_prestige_full', `
+        <div class="online-prestige online-prestige--full selector">
+          <div class="online-prestige__img">
+            <img alt="">
+            <div class="online-prestige__loader"></div>
+          </div>
+          <div class="online-prestige__body">
+            <div class="online-prestige__head">
+              <div class="online-prestige__title">{title}</div>
+              <div class="online-prestige__time">{time}</div>
+            </div>
+            <div class="online-prestige__timeline"></div>
+            <div class="online-prestige__footer">
+              <div class="online-prestige__info">{info}</div>
+              <div class="online-prestige__quality">{quality}</div>
+            </div>
+          </div>
+        </div>
+      `);
+
+      Lampa.Template.add('online_does_not_answer', `
+        <div class="online-empty">
+          <div class="online-empty__title">
+            #{online_balanser_dont_work}
+          </div>
+          <div class="online-empty__templates">
+            <div class="online-empty-template">
+              <div class="online-empty-template__ico"></div>
+              <div class="online-empty-template__body"></div>
+            </div>
+            <div class="online-empty-template">
+              <div class="online-empty-template__ico"></div>
+              <div class="online-empty-template__body"></div>
+            </div>
+            <div class="online-empty-template">
+              <div class="online-empty-template__ico"></div>
+              <div class="online-empty-template__body"></div>
+            </div>
+          </div>
+        </div>
+      `);
+
+      Lampa.Template.add('online_prestige_rate', `
+        <div class="online-prestige-rate">
+          <svg width="17" height="16" viewBox="0 0 17 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8.39409 0.192139L10.99 5.30994L16.7882 6.20387L12.5475 10.4277L13.5819 15.9311L8.39409 13.2425L3.20626 15.9311L4.24065 10.4277L0 6.20387L5.79819 5.30994L8.39409 0.192139Z" fill="#fff"></path>
+          </svg>
+          <span>{rate}</span>
+        </div>
+      `);
+
+      Lampa.Template.add('online_prestige_folder', `
+        <div class="online-prestige online-prestige--folder selector">
+          <div class="online-prestige__folder">
+            <svg viewBox="0 0 128 112" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect y="20" width="128" height="92" rx="13" fill="white"></rect>
+              <path d="M29.9963 8H98.0037C96.0446 3.3021 91.4079 0 86 0H42C36.5921 0 31.9555 3.3021 29.9963 8Z" fill="white" fill-opacity="0.23"></path>
+              <rect x="11" y="8" width="106" height="76" rx="13" fill="white" fill-opacity="0.51"></rect>
+            </svg>
+          </div>
+          <div class="online-prestige__body">
+            <div class="online-prestige__head">
+              <div class="online-prestige__title">{title}</div>
+              <div class="online-prestige__time">{time}</div>
+            </div>
+            <div class="online-prestige__footer">
+              <div class="online-prestige__info">{info}</div>
+            </div>
+          </div>
+        </div>
+      `);
+
+      Lampa.Template.add('icon_viewed', `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 7L9 19L3.5 13.5L4.91 12.09L9 16.17L19.59 5.59L21 7Z" fill="currentColor"/>
+        </svg>
+      `);
     }
 
-    var button = `<div class="full-start__button selector view--online" data-subtitle="Kinogo v${manifest.version}">...</div>`;
+    var button = `<div class="full-start__button selector view--online" data-subtitle="Kinogo v${manifest.version}">
+      <svg width="135" height="147" viewBox="0 0 135 147" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M121.5 96.8823C139.5 86.49 139.5 60.5092 121.5 50.1169L41.25 3.78454C23.25 -6.60776 0.750004 6.38265 0.750001 27.1673L0.75 51.9742C4.70314 35.7475 23.6209 26.8138 39.0547 35.7701L94.8534 68.1505C110.252 77.0864 111.909 97.8693 99.8725 109.369L121.5 96.8823Z" fill="currentColor"/>
+        <path d="M63 84.9836C80.3333 94.991 80.3333 120.01 63 130.017L39.75 143.44C22.4167 153.448 0.749999 140.938 0.75 120.924L0.750001 94.0769C0.750002 74.0621 22.4167 61.5528 39.75 71.5602L63 84.9836Z" fill="currentColor"/>
+      </svg>
+      <span>#{title_online}</span>
+    </div>`;
 
+    // Инициализация компонента
     Lampa.Component.add('online_kinogo', component);
     resetTemplates();
     
+    // Добавляем кнопку в интерфейс
     Lampa.Listener.follow('full', function(e) {
       if (e.type == 'complite') {
         var btn = $(Lampa.Lang.translate(button));
@@ -1144,4 +1381,4 @@
   if (!window.online_kinogo && Lampa.Manifest.app_digital >= 155) startPlugin();
 
 })();
-// V3.3
+// V3.4
