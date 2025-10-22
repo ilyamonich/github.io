@@ -1,10 +1,10 @@
 (function() {
   'use strict';
 
-  var plugin_name = 'onlinevideo';
+  var plugin_name = 'rezka';
   var modalopen = false;
 
-  function onlineVideoAPI(component, _object) {
+  function rezkaAPI(component, _object) {
     var network = new Lampa.Reguest();
     var results = [];
     var object = _object;
@@ -16,13 +16,13 @@
       voice_name: ''
     };
 
-    // Локальные тестовые видео файлы (работают без CORS)
+    // Тестовые видео с рабочими ссылками
     function getTestVideos() {
       return [
         {
           id: 1,
-          title: '🎬 Тестовое видео 1',
-          translation: 'Демо ролик HD',
+          title: '🎬 Демо видео 1',
+          translation: 'Русская озвучка',
           quality: '720p',
           qualities: ['480', '720'],
           url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
@@ -30,45 +30,21 @@
         },
         {
           id: 2,
-          title: '🎬 Тестовое видео 2', 
-          translation: 'Короткий демо',
-          quality: '480p',
-          qualities: ['360', '480'],
+          title: '🎬 Демо видео 2', 
+          translation: 'Оригинал с субтитрами',
+          quality: '1080p',
+          qualities: ['720', '1080'],
           url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
           type: 'direct'
         },
         {
           id: 3,
-          title: '🎬 Тестовое видео 3',
-          translation: 'Демо с субтитрами',
-          quality: '1080p',
-          qualities: ['720', '1080'],
+          title: '🎬 Демо видео 3',
+          translation: 'Многоголосый перевод',
+          quality: '480p',
+          qualities: ['360', '480'],
           url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
           type: 'direct'
-        }
-      ];
-    }
-
-    // Альтернативные HLS потоки (если прямые ссылки не работают)
-    function getHLSVideos() {
-      return [
-        {
-          id: 1,
-          title: '📺 HLS Тест 1',
-          translation: 'Адаптивный поток',
-          quality: '720p',
-          qualities: ['480', '720', '1080'],
-          url: 'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8',
-          type: 'hls'
-        },
-        {
-          id: 2,
-          title: '📺 HLS Тест 2',
-          translation: 'Мультибитрейт',
-          quality: '1080p', 
-          qualities: ['360', '720', '1080'],
-          url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-          type: 'hls'
         }
       ];
     }
@@ -85,22 +61,14 @@
       
       Lampa.Noty.show('🔍 Поиск: ' + (query || 'демо видео'));
       
-      // Имитируем поиск с задержкой
       setTimeout(function() {
         var searchResults = [
           {
-            id: 'demo_main',
+            id: 'main',
             title: (object.movie && object.movie.title) || 'Демо фильм',
             original_title: (object.movie && object.movie.original_title) || 'Demo Movie',
             year: new Date().getFullYear(),
             url: 'demo'
-          },
-          {
-            id: 'demo_alt',
-            title: ((object.movie && object.movie.title) || 'Фильм') + ' - альтернативная версия',
-            original_title: (object.movie && object.movie.original_title) || 'Demo Movie',
-            year: new Date().getFullYear(),
-            url: 'demo_alt'
           }
         ];
         
@@ -114,7 +82,7 @@
     this.find = function(video_id) {
       var _this = this;
       
-      Lampa.Noty.show('🎬 Подготавливаем видео...');
+      Lampa.Noty.show('🎬 Загружаем видео...');
       
       setTimeout(function() {
         var videoData = {
@@ -136,22 +104,10 @@
           });
         });
 
-        // Добавляем HLS видео
-        var hlsVideos = getHLSVideos();
-        hlsVideos.forEach(function(video) {
-          videoData.player_links.movie.push({
-            translation: video.translation,
-            link: video.url,
-            qualities: video.qualities,
-            title: video.title,
-            type: video.type
-          });
-        });
-
         if (videoData.player_links.movie.length > 0) {
           _this.success(videoData);
           component.loading(false);
-          Lampa.Noty.show('✅ Готово! Выберите видео для просмотра');
+          Lampa.Noty.show('✅ Готово к просмотру!');
         } else {
           component.doesNotAnswer();
         }
@@ -317,12 +273,6 @@
                   quality: extra.quality
                 };
 
-                // Добавляем информацию о типе видео
-                if (extra.type === 'hls') {
-                  playData.hls = true;
-                }
-
-                console.log('Playing video:', playData);
                 Lampa.Player.play(playData);
                 
                 if (item.mark) {
@@ -330,10 +280,10 @@
                 }
               } catch (e) {
                 console.error('Play error:', e);
-                Lampa.Noty.show('❌ Ошибка воспроизведения: ' + e.message);
+                Lampa.Noty.show('❌ Ошибка: ' + e.message);
               }
             } else {
-              Lampa.Noty.show('❌ Ошибка: нет ссылки на видео');
+              Lampa.Noty.show('❌ Нет ссылки на видео');
             }
           },
           onContextMenu: function onContextMenu(item, html, data, call) {
@@ -357,13 +307,13 @@
     var files = new Lampa.Explorer(object);
     var filter = new Lampa.Filter(object);
     var sources = {
-      onlinevideo: onlineVideoAPI
+      rezka: rezkaAPI
     };
     var last;
     var extended;
     var selected_id;
     var source;
-    var balanser = 'onlinevideo';
+    var balanser = 'rezka';
     var initialized;
     var balanser_timer;
     var images = [];
@@ -487,8 +437,6 @@
         return;
       }
 
-      Lampa.Noty.show('Выберите вариант:');
-
       json.forEach(function(elem) {
         if (!elem) return;
 
@@ -599,7 +547,7 @@
       
       this.saveChoice(choice);
       if (filter_items.voice && filter_items.voice.length) {
-        add('voice', 'Тип видео');
+        add('voice', 'Перевод');
       }
       
       filter.set('filter', select);
@@ -621,7 +569,7 @@
       for (var i in need) {
         if (filter_items[i] && filter_items[i].length && need[i] !== undefined) {
           if (i == 'voice') {
-            select.push('Тип: ' + filter_items[i][need[i]]);
+            select.push('Перевод: ' + filter_items[i][need[i]]);
           }
         }
       }
@@ -651,15 +599,13 @@
         return;
       }
 
-      Lampa.Noty.show('✅ Доступно видео: ' + items.length + ' вариантов');
+      Lampa.Noty.show('✅ Найдено видео: ' + items.length + ' вариантов');
 
       var viewed = [];
-      var scroll_to_element = false;
       
       items.forEach(function(element, index) {
         if (!element) return;
 
-        // Устанавливаем базовые свойства
         element.info = element.voice_name || '';
         element.quality = element.quality || '720p';
         element.time = '00:00';
@@ -733,7 +679,7 @@
           }
 
           Lampa.Select.show({
-            title: 'Online Video',
+            title: 'Rezka',
             items: menu,
             onBack: function onBack() {
               Lampa.Controller.toggle(enabled);
@@ -765,7 +711,7 @@
       
       var html = Lampa.Template.get('online_does_not_answer', {});
       html.find('.online-empty__buttons').remove();
-      html.find('.online-empty__title').text(msg || 'Выберите вариант из списка');
+      html.find('.online-empty__title').text(msg || 'Нет доступных видео');
       scroll.append(html);
       this.loading(false);
     };
@@ -774,7 +720,7 @@
       this.reset();
       if (scroll) {
         var html = Lampa.Template.get('online_does_not_answer', {
-          balanser: 'Online Video'
+          balanser: 'Rezka'
         });
         scroll.append(html);
       }
@@ -814,7 +760,7 @@
           if (Navigator.canmove('right')) {
             Navigator.move('right');
           } else if (filter && filter.show) {
-            filter.show('Online Video', 'filter');
+            filter.show('Rezka', 'filter');
           }
         },
         left: function left() {
@@ -860,29 +806,29 @@
   }
 
   function startPlugin() {
-    if (window.online_video_plugin) return;
+    if (window.rezka_plugin) return;
     
-    window.online_video_plugin = true;
+    window.rezka_plugin = true;
     
     var manifest = {
       type: 'video',
-      version: '1.0.4',
-      name: 'Online Video',
-      description: 'Плагин для просмотра тестового онлайн видео',
-      component: 'online_video',
+      version: '1.0.5',
+      name: 'Rezka (Demo)',
+      description: 'Демо плагин для просмотра онлайн видео',
+      component: 'online_rezka',
       onContextMenu: function onContextMenu(object) {
         return {
-          name: '🎬 Смотреть онлайн (тест)',
-          description: 'Тестовые видео потоки'
+          name: '🎬 Rezka (демо)',
+          description: 'Тестовые видео'
         };
       },
       onContextLauch: function onContextLauch(object) {
         resetTemplates();
-        Lampa.Component.add('online_video', component);
+        Lampa.Component.add('online_rezka', component);
         Lampa.Activity.push({
           url: '',
-          title: 'Online Video',
-          component: 'online_video',
+          title: 'Rezka (Demo)',
+          component: 'online_rezka',
           search: object.title,
           search_one: object.title,
           search_two: object.original_title,
@@ -894,7 +840,7 @@
     
     Lampa.Manifest.plugins = manifest;
     
-    // Простые CSS стили
+    // CSS стили
     Lampa.Template.add('online_prestige_css', `
         <style>
         .online-prestige {
@@ -933,7 +879,7 @@
             color: #aaa;
             font-size: 14px;
         }
-        .view--online {
+        .view--online-rezka {
             background: linear-gradient(45deg, #667eea, #764ba2);
             border-radius: 12px;
             margin: 8px;
@@ -942,9 +888,16 @@
             font-weight: bold;
             color: white;
             border: none;
+            cursor: pointer;
         }
-        .view--online:hover {
+        .view--online-rezka:hover {
             background: linear-gradient(45deg, #764ba2, #667eea);
+        }
+        .full-start__button.view--online-rezka {
+            min-height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
         </style>
     `);
@@ -964,8 +917,8 @@
       Lampa.Template.add('online_does_not_answer', `
           <div style="padding: 40px 20px; text-align: center; color: #888;">
               <div style="font-size: 48px; margin-bottom: 16px;">🎬</div>
-              <div style="font-size: 20px; margin-bottom: 16px; color: #fff;">Online Video Plugin</div>
-              <div style="font-size: 14px;">Выберите видео из списка для тестирования</div>
+              <div style="font-size: 20px; margin-bottom: 16px; color: #fff;">Rezka Demo</div>
+              <div style="font-size: 14px;">Демонстрационный плагин для тестирования</div>
           </div>
       `);
       
@@ -979,56 +932,131 @@
       `);
     }
 
-    var button = `
-        <div class="full-start__button selector view--online">
-            <div style="padding: 12px;">
+    // Создаем кнопку для Rezka
+    function createRezkaButton() {
+        var button = document.createElement('div');
+        button.className = 'full-start__button selector view--online-rezka';
+        button.innerHTML = `
+            <div style="padding: 12px; text-align: center;">
                 <div style="font-size: 24px; margin-bottom: 8px;">🎬</div>
-                <div style="font-size: 14px; font-weight: bold;">Online Video</div>
-                <div style="font-size: 11px; opacity: 0.8; margin-top: 4px;">Тестовые видео</div>
+                <div style="font-size: 14px; font-weight: bold;">Rezka</div>
+                <div style="font-size: 11px; opacity: 0.8; margin-top: 4px;">Демо режим</div>
             </div>
-        </div>
-    `;
-
-    Lampa.Component.add('online_video', component);
-    resetTemplates();
-    
-    Lampa.Listener.follow('full', function(e) {
-      if (e.type == 'complite') {
-        var btn = $(button);
-        btn.on('hover:enter', function() {
-          resetTemplates();
-          Lampa.Component.add('online_video', component);
-          Lampa.Activity.push({
-            url: '',
-            title: 'Online Video',
-            component: 'online_video',
-            search: e.data.movie.title,
-            search_one: e.data.movie.title,
-            search_two: e.data.movie.original_title,
-            movie: e.data.movie,
-            page: 1
-          });
+        `;
+        
+        button.addEventListener('click', function() {
+            resetTemplates();
+            Lampa.Component.add('online_rezka', component);
+            Lampa.Activity.push({
+                url: '',
+                title: 'Rezka (Demo)',
+                component: 'online_rezka',
+                search: '',
+                movie: window.Lampa.Activity.active().movie || {},
+                page: 1
+            });
         });
         
-        var buttonsContainer = e.object.activity.render().find('.full-start__buttons');
-        if (buttonsContainer.length) {
-          buttonsContainer.append(btn);
+        return button;
+    }
+
+    Lampa.Component.add('online_rezka', component);
+    resetTemplates();
+    
+    // Слушаем событие загрузки карточки фильма
+    Lampa.Listener.follow('full', function(e) {
+        if (e.type == 'complite') {
+            // Ждем пока полностью загрузится интерфейс
+            setTimeout(function() {
+                var buttonsContainer = document.querySelector('.full-start__buttons');
+                if (buttonsContainer) {
+                    // Проверяем, нет ли уже нашей кнопки
+                    var existingButton = buttonsContainer.querySelector('.view--online-rezka');
+                    if (!existingButton) {
+                        var rezkaButton = createRezkaButton();
+                        buttonsContainer.appendChild(rezkaButton);
+                        console.log('✅ Rezka button added successfully');
+                    }
+                } else {
+                    console.log('❌ Buttons container not found');
+                    // Пробуем найти контейнер позже
+                    setTimeout(function() {
+                        var buttonsContainer = document.querySelector('.full-start__buttons');
+                        if (buttonsContainer) {
+                            var existingButton = buttonsContainer.querySelector('.view--online-rezka');
+                            if (!existingButton) {
+                                var rezkaButton = createRezkaButton();
+                                buttonsContainer.appendChild(rezkaButton);
+                                console.log('✅ Rezka button added on second attempt');
+                            }
+                        }
+                    }, 1000);
+                }
+            }, 500);
         }
-      }
     });
 
-    console.log('✅ Online Video Plugin loaded successfully');
-    Lampa.Noty.show('✅ Online Video plugin loaded');
+    // Альтернативный способ - добавляем кнопку при клике на меню
+    Lampa.Listener.follow('controller', function(e) {
+        if (e.type == 'context' && e.data && e.data.name === 'more') {
+            setTimeout(function() {
+                var contextMenu = document.querySelector('.selectbox');
+                if (contextMenu) {
+                    // Добавляем пункт в контекстное меню
+                    var rezkaItem = document.createElement('div');
+                    rezkaItem.className = 'selector';
+                    rezkaItem.innerHTML = `
+                        <div style="padding: 12px; display: flex; align-items: center;">
+                            <div style="font-size: 20px; margin-right: 12px;">🎬</div>
+                            <div>
+                                <div style="font-weight: bold;">Rezka (демо)</div>
+                                <div style="font-size: 12px; opacity: 0.7;">Тестовые видео</div>
+                            </div>
+                        </div>
+                    `;
+                    rezkaItem.addEventListener('click', function() {
+                        resetTemplates();
+                        Lampa.Component.add('online_rezka', component);
+                        Lampa.Activity.push({
+                            url: '',
+                            title: 'Rezka (Demo)',
+                            component: 'online_rezka', 
+                            search: '',
+                            movie: window.Lampa.Activity.active().movie || {},
+                            page: 1
+                        });
+                        Lampa.Select.close();
+                    });
+                    
+                    contextMenu.querySelector('.selectbox__body').appendChild(rezkaItem);
+                }
+            }, 100);
+        }
+    });
+
+    console.log('✅ Rezka Plugin loaded successfully');
   }
 
-  // Загружаем плагин после инициализации Lampa
+  // Загружаем плагин
   if (Lampa.Manifest.app_digital >= 155) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', startPlugin);
     } else {
-      setTimeout(startPlugin, 3000);
+      // Ждем полной загрузки Lampa
+      var checkLampa = setInterval(function() {
+        if (window.Lampa && window.Lampa.Manifest) {
+          clearInterval(checkLampa);
+          startPlugin();
+        }
+      }, 1000);
+      
+      // На всякий случай запускаем через 5 секунд
+      setTimeout(function() {
+        if (!window.rezka_plugin) {
+          startPlugin();
+        }
+      }, 5000);
     }
   }
 
 })();
-// V4.1
