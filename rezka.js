@@ -1908,6 +1908,30 @@
 }
 
 if (!window.kinobaza_plugin) startPlugin();
+
+	// Принудительное добавление Kinogo.ec в доступные источники
+function forceAddKinogoSource() {
+    if (window.kinobaza_plugin && balansers_with_search) {
+        // Добавляем Kinogo.ec в список балансеров с поиском
+        if (!balansers_with_search.includes('kinogo')) {
+            balansers_with_search.push('kinogo');
+        }
+        
+        // Также добавляем в общий список источников
+        var network = new Lampa.Reguest();
+        network.timeout(5000);
+        network.silent(account('https://rc.bwa.to/lite/kinogo/available'), function(available) {
+            if (available && available.status === 'ok') {
+                console.log('Kinogo.ec: источник доступен');
+            }
+        }, function() {
+            console.log('Kinogo.ec: источник временно недоступен');
+        });
+    }
+}
+
+// Вызываем после загрузки плагина
+setTimeout(forceAddKinogoSource, 2000);
 	
 })();
-// kinobaza1
+// kinobaza2
