@@ -1,30 +1,10 @@
 (function() {
   'use strict';
 
-  var plugin_name = 'rezka';
-  var sources = {
-    'hdrezka': {
-      name: 'HDRezka',
-      url: 'https://hdrezka.ag',
-      search: '/search/?do=search&subaction=search&q='
-    },
-    'rezka': {
-      name: 'Rezka',
-      url: 'https://rezka.ag', 
-      search: '/search/?do=search&subaction=search&q='
-    },
-    'ashdi': {
-      name: 'Ashdi',
-      url: 'https://ashdi.vip',
-      search: '/index.php?do=search'
-    }
-  };
-  
-  var current_source = 'hdrezka';
-  var proxy_url = 'https://corsproxy.io/?';
+  var plugin_name = 'onlinevideo';
   var modalopen = false;
 
-  function rezkaAPI(component, _object) {
+  function onlineVideoAPI(component, _object) {
     var network = new Lampa.Reguest();
     var results = [];
     var object = _object;
@@ -36,168 +16,61 @@
       voice_name: ''
     };
 
-    function normalizeString(str) {
-      return str ? str.toLowerCase().replace(/[^a-zа-я0-9]/g, '') : '';
-    }
-
-    function getSource() {
-      return sources[current_source] || sources.hdrezka;
-    }
-
-    function parseSearchResults(html) {
-      var items = [];
-      try {
-        // Упрощенный парсинг - ищем любые ссылки с названиями
-        var titleMatches = html.match(/<a[^>]*class="[^"]*b-content__inline_item-link[^"]*"[^>]*>([^<]*)<\/a>/g) || [];
-        var yearMatches = html.match(/(\d{4})/g) || [];
-        
-        var year = parseInt((object.movie.release_date || object.movie.first_air_date || '0000').slice(0, 4)) || new Date().getFullYear();
-        
-        // Создаем демо-результаты на основе запроса
-        var searchQuery = object.search || object.movie.title || object.movie.name || '';
-        
-        if (searchQuery) {
-          items.push({
-            id: 'demo_1',
-            title: searchQuery + ' (' + year + ')',
-            original_title: searchQuery,
-            year: year,
-            url: 'demo'
-          });
-          
-          // Добавляем несколько вариантов
-          items.push({
-            id: 'demo_2', 
-            title: searchQuery + ' - Русская озвучка',
-            original_title: searchQuery,
-            year: year - 1,
-            url: 'demo'
-          });
-        } else {
-          // Общие демо-результаты
-          items = [
-            {
-              id: 'demo_1',
-              title: 'Демо фильм 1 (' + year + ')',
-              original_title: 'Demo Movie 1',
-              year: year,
-              url: 'demo'
-            },
-            {
-              id: 'demo_2',
-              title: 'Демо фильм 2 (' + (year - 1) + ')', 
-              original_title: 'Demo Movie 2',
-              year: year - 1,
-              url: 'demo'
-            }
-          ];
-        }
-        
-      } catch (e) {
-        console.error('Error in parseSearchResults:', e);
-        // Возвращаем демо-результаты при ошибке
-        return getDemoSearchResults();
-      }
-      
-      return items.length > 0 ? items : getDemoSearchResults();
-    }
-
-    function getDemoSearchResults() {
-      var year = parseInt((object.movie.release_date || object.movie.first_air_date || '0000').slice(0, 4)) || new Date().getFullYear();
-      var searchQuery = object.search || object.movie.title || object.movie.name || 'Фильм';
-      
+    // Локальные тестовые видео файлы (работают без CORS)
+    function getTestVideos() {
       return [
         {
-          id: 'demo_1',
-          title: searchQuery + ' (' + year + ')',
-          original_title: searchQuery,
-          year: year,
-          url: 'demo'
+          id: 1,
+          title: '🎬 Тестовое видео 1',
+          translation: 'Демо ролик HD',
+          quality: '720p',
+          qualities: ['480', '720'],
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+          type: 'direct'
         },
         {
-          id: 'demo_2',
-          title: searchQuery + ' - полная версия',
-          original_title: searchQuery,
-          year: year,
-          url: 'demo' 
+          id: 2,
+          title: '🎬 Тестовое видео 2', 
+          translation: 'Короткий демо',
+          quality: '480p',
+          qualities: ['360', '480'],
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
+          type: 'direct'
+        },
+        {
+          id: 3,
+          title: '🎬 Тестовое видео 3',
+          translation: 'Демо с субтитрами',
+          quality: '1080p',
+          qualities: ['720', '1080'],
+          url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
+          type: 'direct'
         }
       ];
     }
 
-    function parseVideoPage(html) {
-      var result = {
-        player_links: {
-          movie: [],
-          playlist: {}
+    // Альтернативные HLS потоки (если прямые ссылки не работают)
+    function getHLSVideos() {
+      return [
+        {
+          id: 1,
+          title: '📺 HLS Тест 1',
+          translation: 'Адаптивный поток',
+          quality: '720p',
+          qualities: ['480', '720', '1080'],
+          url: 'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8',
+          type: 'hls'
+        },
+        {
+          id: 2,
+          title: '📺 HLS Тест 2',
+          translation: 'Мультибитрейт',
+          quality: '1080p', 
+          qualities: ['360', '720', '1080'],
+          url: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
+          type: 'hls'
         }
-      };
-
-      try {
-        // Создаем демо-видео данные с тестовыми потоками
-        var testStreams = [
-          'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-          'https://multiplatform-f.akamaihd.net/i/multi/will/bunny/big_buck_bunny_,640x360_400,640x360_700,640x360_1000,950x540_1500,.f4v.csmil/master.m3u8',
-          'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8'
-        ];
-
-        // Добавляем несколько вариантов переводов
-        var translations = ['Русская озвучка', 'Оригинал с субтитрами', 'Многоголосый перевод'];
-        
-        translations.forEach(function(translation, index) {
-          result.player_links.movie.push({
-            translation: translation,
-            link: testStreams[index % testStreams.length],
-            qualities: ['360', '480', '720', '1080']
-          });
-        });
-
-      } catch (e) {
-        console.error('Error in parseVideoPage:', e);
-        return getDemoVideoData();
-      }
-      
-      return result;
-    }
-
-    function getDemoVideoData() {
-      return {
-        player_links: {
-          movie: [
-            {
-              translation: 'Демо перевод HD',
-              link: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-              qualities: ['480', '720', '1080']
-            }
-          ],
-          playlist: {}
-        }
-      };
-    }
-
-    function getDirectVideoLinks() {
-      // Возвращает прямые ссылки на тестовые видео
-      return {
-        player_links: {
-          movie: [
-            {
-              translation: '📺 Тестовое видео 1 (рабочее)',
-              link: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
-              qualities: ['480', '720', '1080']
-            },
-            {
-              translation: '📺 Тестовое видео 2 (рабочее)', 
-              link: 'https://multiplatform-f.akamaihd.net/i/multi/will/bunny/big_buck_bunny_,640x360_400,640x360_700,640x360_1000,950x540_1500,.f4v.csmil/master.m3u8',
-              qualities: ['360', '480', '720']
-            },
-            {
-              translation: '📺 Тестовое видео 3 (рабочее)',
-              link: 'https://bitdash-a.akamaihd.net/content/sintel/hls/playlist.m3u8',
-              qualities: ['480', '720', '1080']
-            }
-          ],
-          playlist: {}
-        }
-      };
+      ];
     }
 
     this.search = function(_object, sim) {
@@ -210,43 +83,75 @@
       var _this = this;
       object = _object;
       
-      if (!query) {
-        Lampa.Noty.show('Пустой запрос');
-        component.doesNotAnswer();
-        return;
-      }
-
-      Lampa.Noty.show('Ищем: ' + query);
+      Lampa.Noty.show('🔍 Поиск: ' + (query || 'демо видео'));
       
-      // Имитируем задержку поиска
+      // Имитируем поиск с задержкой
       setTimeout(function() {
-        var foundItems = parseSearchResults('');
+        var searchResults = [
+          {
+            id: 'demo_main',
+            title: (object.movie && object.movie.title) || 'Демо фильм',
+            original_title: (object.movie && object.movie.original_title) || 'Demo Movie',
+            year: new Date().getFullYear(),
+            url: 'demo'
+          },
+          {
+            id: 'demo_alt',
+            title: ((object.movie && object.movie.title) || 'Фильм') + ' - альтернативная версия',
+            original_title: (object.movie && object.movie.original_title) || 'Demo Movie',
+            year: new Date().getFullYear(),
+            url: 'demo_alt'
+          }
+        ];
         
-        if (foundItems && foundItems.length > 0) {
-          // Показываем похожие результаты
-          wait_similars = true;
-          component.similars(foundItems);
-          component.loading(false);
-          Lampa.Noty.show('Найдено: ' + foundItems.length + ' вариантов');
-        } else {
-          component.doesNotAnswer();
-        }
+        wait_similars = true;
+        component.similars(searchResults);
+        component.loading(false);
+        
       }, 1000);
     };
 
-    this.find = function(rezka_url) {
+    this.find = function(video_id) {
       var _this = this;
       
-      Lampa.Noty.show('Загружаем видео...');
+      Lampa.Noty.show('🎬 Подготавливаем видео...');
       
-      // Имитируем загрузку
       setTimeout(function() {
-        var videoData = getDirectVideoLinks();
-        
-        if (videoData && videoData.player_links && videoData.player_links.movie.length > 0) {
+        var videoData = {
+          player_links: {
+            movie: [],
+            playlist: {}
+          }
+        };
+
+        // Добавляем тестовые видео
+        var testVideos = getTestVideos();
+        testVideos.forEach(function(video) {
+          videoData.player_links.movie.push({
+            translation: video.translation,
+            link: video.url,
+            qualities: video.qualities,
+            title: video.title,
+            type: video.type
+          });
+        });
+
+        // Добавляем HLS видео
+        var hlsVideos = getHLSVideos();
+        hlsVideos.forEach(function(video) {
+          videoData.player_links.movie.push({
+            translation: video.translation,
+            link: video.url,
+            qualities: video.qualities,
+            title: video.title,
+            type: video.type
+          });
+        });
+
+        if (videoData.player_links.movie.length > 0) {
           _this.success(videoData);
           component.loading(false);
-          Lampa.Noty.show('✅ Готово к просмотру!');
+          Lampa.Noty.show('✅ Готово! Выберите видео для просмотра');
         } else {
           component.doesNotAnswer();
         }
@@ -305,7 +210,7 @@
     }
 
     function extractData(data) {
-      // Упрощенная логика извлечения данных
+      // Минимальная логика извлечения данных
     }
 
     function getFile(element, max_quality) {
@@ -322,7 +227,8 @@
       
       return {
         file: file_url,
-        quality: quality_obj
+        quality: quality_obj,
+        type: element.type || 'direct'
       };
     }
 
@@ -365,13 +271,14 @@
           })) : 720;
           
           filtred.push({
-            title: movie.translation || 'Перевод ' + (index + 1),
+            title: movie.title || movie.translation || 'Видео ' + (index + 1),
             quality: maxQuality + 'p',
             qualitys: qualities,
             translation: index + 1,
             voice_name: movie.translation || 'Перевод ' + (index + 1),
             file: movie.link,
-            url: movie.link
+            url: movie.link,
+            type: movie.type || 'direct'
           });
         });
       }
@@ -386,7 +293,8 @@
         url: extra.file,
         quality: extra.quality,
         timeline: element.timeline || {percent: 0, time: 0, duration: 0},
-        callback: element.mark || function() {}
+        callback: element.mark || function() {},
+        type: extra.type
       };
       return play;
     }
@@ -400,35 +308,32 @@
             var extra = getFile(item, item.quality);
 
             if (extra.file) {
-              var playlist = [];
-              var first = toPlayElement(item);
-
-              if (item.season) {
-                items.forEach(function(elem) {
-                  playlist.push(toPlayElement(elem));
-                });
-              } else {
-                playlist.push(first);
-              }
-
-              if (playlist.length > 1) {
-                first.playlist = playlist;
-              }
+              Lampa.Noty.show('🎬 Запускаем: ' + item.title);
               
-              Lampa.Noty.show('🎬 Запускаем видео...');
               try {
-                Lampa.Player.play(first);
-                if (playlist.length > 1) {
-                  Lampa.Player.playlist(playlist);
+                var playData = {
+                  title: item.title,
+                  url: extra.file,
+                  quality: extra.quality
+                };
+
+                // Добавляем информацию о типе видео
+                if (extra.type === 'hls') {
+                  playData.hls = true;
                 }
+
+                console.log('Playing video:', playData);
+                Lampa.Player.play(playData);
+                
                 if (item.mark) {
                   item.mark();
                 }
               } catch (e) {
-                Lampa.Noty.show('❌ Ошибка: ' + e.message);
+                console.error('Play error:', e);
+                Lampa.Noty.show('❌ Ошибка воспроизведения: ' + e.message);
               }
             } else {
-              Lampa.Noty.show('❌ Ссылка на видео не найдена');
+              Lampa.Noty.show('❌ Ошибка: нет ссылки на видео');
             }
           },
           onContextMenu: function onContextMenu(item, html, data, call) {
@@ -452,21 +357,16 @@
     var files = new Lampa.Explorer(object);
     var filter = new Lampa.Filter(object);
     var sources = {
-      rezka: rezkaAPI
+      onlinevideo: onlineVideoAPI
     };
     var last;
     var extended;
     var selected_id;
     var source;
-    var balanser = 'rezka';
+    var balanser = 'onlinevideo';
     var initialized;
     var balanser_timer;
     var images = [];
-    var filter_translate = {
-      season: 'Сезон',
-      voice: 'Перевод',
-      source: 'Источник'
-    };
 
     this.activity = {
       loader: function(status) {
@@ -549,11 +449,11 @@
       if (source && source.searchByTitle) {
         this.extendChoice();
         var searchQuery = object.search || 
-                         object.movie.original_title || 
+                         (object.movie && (object.movie.original_title || 
                          object.movie.original_name || 
                          object.movie.title || 
-                         object.movie.name ||
-                         '';
+                         object.movie.name)) ||
+                         'демо видео';
         source.searchByTitle(object, searchQuery);
       }
     };
@@ -562,14 +462,6 @@
       var balancer_key = for_balanser || balanser;
       var data = Lampa.Storage.cache('online_choice_' + balancer_key, 3000, {});
       var save = data[selected_id || (object.movie && object.movie.id) || 'default'] || {};
-      Lampa.Arrays.extend(save, {
-        season: 0,
-        voice: 0,
-        voice_name: '',
-        voice_id: 0,
-        episodes_view: {},
-        movie_view: ''
-      });
       return save;
     };
 
@@ -605,7 +497,7 @@
         
         if (year) info.push(year);
 
-        var name = elem.title || 'Без названия';
+        var name = elem.title || 'Демо видео';
         elem.title = name;
         elem.time = '';
         elem.info = info.join('<span class="online-prestige-split">●</span>');
@@ -616,7 +508,6 @@
             _this.activity.loader(true);
           }
           _this.reset();
-          object.search_date = year;
           selected_id = elem.id;
           _this.extendChoice();
 
@@ -708,7 +599,7 @@
       
       this.saveChoice(choice);
       if (filter_items.voice && filter_items.voice.length) {
-        add('voice', 'Перевод');
+        add('voice', 'Тип видео');
       }
       
       filter.set('filter', select);
@@ -730,20 +621,13 @@
       for (var i in need) {
         if (filter_items[i] && filter_items[i].length && need[i] !== undefined) {
           if (i == 'voice') {
-            select.push('Перевод: ' + filter_items[i][need[i]]);
+            select.push('Тип: ' + filter_items[i][need[i]]);
           }
         }
       }
 
       filter.chosen('filter', select);
       filter.chosen('sort', [balanser]);
-    };
-
-    this.getEpisodes = function(season, call) {
-      var episodes = [];
-      if (call && typeof call === 'function') {
-        call(episodes);
-      }
     };
 
     this.append = function(item) {
@@ -758,21 +642,6 @@
       }
     };
 
-    this.watched = function(set) {
-      var file_id = Lampa.Utils.hash(object.movie && object.movie.number_of_seasons ? 
-        (object.movie.original_name || '') : 
-        (object.movie.original_title || ''));
-      var watched = Lampa.Storage.cache('online_watched_last', 5000, {});
-
-      if (set) {
-        if (!watched[file_id]) watched[file_id] = {};
-        Lampa.Arrays.extend(watched[file_id], set, true);
-        Lampa.Storage.set('online_watched_last', watched);
-      } else {
-        return watched[file_id];
-      }
-    };
-
     this.draw = function(items) {
       var _this = this;
       var params = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : {};
@@ -782,89 +651,65 @@
         return;
       }
 
-      Lampa.Noty.show('✅ Найдено видео: ' + items.length + ' шт');
+      Lampa.Noty.show('✅ Доступно видео: ' + items.length + ' вариантов');
 
-      this.getEpisodes(items[0].season, function(episodes) {
-        var viewed = Lampa.Storage.cache('online_view', 5000, []);
-        var serial = false;
+      var viewed = [];
+      var scroll_to_element = false;
+      
+      items.forEach(function(element, index) {
+        if (!element) return;
 
-        var choice = _this.getChoice();
-        var scroll_to_element = false;
+        // Устанавливаем базовые свойства
+        element.info = element.voice_name || '';
+        element.quality = element.quality || '720p';
+        element.time = '00:00';
         
-        items.forEach(function(element, index) {
-          if (!element) return;
+        var html = Lampa.Template.get('online_prestige_full', element);
 
-          Lampa.Arrays.extend(element, {
-            info: element.voice_name || '',
-            quality: element.quality || '720p',
-            time: '00:00'
-          });
-          
-          var info = [];
-          if (element.info) info.push(element.info);
-          if (info.length) {
-            element.info = info.map(function(i) {
-              return '<span>' + i + '</span>';
-            }).join('<span class="online-prestige-split">●</span>');
+        element.mark = function() {
+          viewed = Lampa.Storage.cache('online_view', 5000, []);
+          var hash = Lampa.Utils.hash(element.title + element.url);
+          if (viewed.indexOf(hash) == -1) {
+            viewed.push(hash);
+            Lampa.Storage.set('online_view', viewed);
           }
-          
-          var html = Lampa.Template.get('online_prestige_full', element);
+        };
 
-          element.mark = function() {
-            viewed = Lampa.Storage.cache('online_view', 5000, []);
-            var hash = Lampa.Utils.hash(element.title + element.url);
-            if (viewed.indexOf(hash) == -1) {
-              viewed.push(hash);
-              Lampa.Storage.set('online_view', viewed);
-            }
-          };
-
-          html.on('hover:enter', function() {
-            if (object.movie && object.movie.id) {
-              Lampa.Favorite.add('history', object.movie, 100);
-            }
-            if (params.onEnter) {
-              params.onEnter(element, html, {});
-            }
-          }).on('hover:focus', function(e) {
-            last = e.target;
-            if (params.onFocus) {
-              params.onFocus(element, html, {});
-            }
-            if (scroll && scroll.update) {
-              scroll.update($(e.target), true);
-            }
-          });
-          
-          if (params.onRender) {
-            params.onRender(element, html, {});
+        html.on('hover:enter', function() {
+          if (object.movie && object.movie.id) {
+            Lampa.Favorite.add('history', object.movie, 100);
           }
-
-          _this.contextMenu({
-            html: html,
-            element: element,
-            onFile: function onFile(call) {
-              if (params.onContextMenu) {
-                params.onContextMenu(element, html, {}, call);
-              }
-            },
-            onClearAllMark: function onClearAllMark() {
-              // Заглушка
-            },
-            onClearAllTime: function onClearAllTime() {
-              // Заглушка
-            }
-          });
-
-          if (scroll && scroll.append) {
-            scroll.append(html);
+          if (params.onEnter) {
+            params.onEnter(element, html, {});
+          }
+        }).on('hover:focus', function(e) {
+          last = e.target;
+          if (params.onFocus) {
+            params.onFocus(element, html, {});
+          }
+          if (scroll && scroll.update) {
+            scroll.update($(e.target), true);
           }
         });
 
-        if (Lampa.Controller && Lampa.Controller.enable) {
-          Lampa.Controller.enable('content');
+        _this.contextMenu({
+          html: html,
+          element: element,
+          onFile: function onFile(call) {
+            if (params.onContextMenu) {
+              params.onContextMenu(element, html, {}, call);
+            }
+          }
+        });
+
+        if (scroll && scroll.append) {
+          scroll.append(html);
         }
       });
+
+      if (Lampa.Controller && Lampa.Controller.enable) {
+        Lampa.Controller.enable('content');
+      }
     };
 
     this.contextMenu = function(params) {
@@ -876,13 +721,13 @@
           var menu = [];
 
           menu.push({
-            title: '▶️ Запустить в Lampa',
+            title: '▶️ Воспроизвести',
             player: 'lampa'
           });
 
           if (extra && extra.file) {
             menu.push({
-              title: '📋 Копировать ссылку',
+              title: '📋 Скопировать ссылку',
               copylink: true
             });
           }
@@ -920,7 +765,7 @@
       
       var html = Lampa.Template.get('online_does_not_answer', {});
       html.find('.online-empty__buttons').remove();
-      html.find('.online-empty__title').text(msg || 'Демо-режим: выберите вариант выше');
+      html.find('.online-empty__title').text(msg || 'Выберите вариант из списка');
       scroll.append(html);
       this.loading(false);
     };
@@ -934,10 +779,6 @@
         scroll.append(html);
       }
       this.loading(false);
-    };
-
-    this.getLastEpisode = function(items) {
-      return 0;
     };
 
     this.start = function() {
@@ -1019,28 +860,29 @@
   }
 
   function startPlugin() {
-    if (window.online_rezka) return;
+    if (window.online_video_plugin) return;
     
-    window.online_rezka = true;
+    window.online_video_plugin = true;
+    
     var manifest = {
       type: 'video',
-      version: '1.0.3',
+      version: '1.0.4',
       name: 'Online Video',
-      description: 'Плагин для просмотра онлайн видео (тестовый режим)',
-      component: 'online_rezka',
+      description: 'Плагин для просмотра тестового онлайн видео',
+      component: 'online_video',
       onContextMenu: function onContextMenu(object) {
         return {
-          name: '🎬 Смотреть онлайн',
+          name: '🎬 Смотреть онлайн (тест)',
           description: 'Тестовые видео потоки'
         };
       },
       onContextLauch: function onContextLauch(object) {
         resetTemplates();
-        Lampa.Component.add('online_rezka', component);
+        Lampa.Component.add('online_video', component);
         Lampa.Activity.push({
           url: '',
           title: 'Online Video',
-          component: 'online_rezka',
+          component: 'online_video',
           search: object.title,
           search_one: object.title,
           search_two: object.original_title,
@@ -1052,51 +894,57 @@
     
     Lampa.Manifest.plugins = manifest;
     
-    // CSS стили
+    // Простые CSS стили
     Lampa.Template.add('online_prestige_css', `
         <style>
         .online-prestige {
-            position: relative;
-            border-radius: .5em;
-            background: rgba(0,0,0,0.3);
-            display: flex;
-            margin-bottom: 1em;
-            padding: 1em;
+            background: rgba(30, 30, 46, 0.8);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 8px 0;
             border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.2s ease;
         }
-        .online-prestige__body {
-            padding: 0 1.2em;
-            line-height: 1.4;
-            flex-grow: 1;
+        .online-prestige:hover, .online-prestige.focus {
+            background: rgba(41, 41, 64, 0.9);
+            border-color: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
         }
         .online-prestige__title {
-            font-size: 1.3em;
-            font-weight: 500;
-            margin-bottom: 0.5em;
+            font-size: 16px;
+            font-weight: 600;
             color: #fff;
-        }
-        .online-prestige__quality {
-            background: rgba(255,255,255,0.2);
-            padding: 0.2em 0.8em;
-            border-radius: 1em;
-            font-size: 0.8em;
-            color: #ccc;
+            margin-bottom: 8px;
         }
         .online-prestige__info {
-            color: #aaa;
-            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .online-prestige.focus {
-            background: rgba(255,255,255,0.15);
-            border-color: rgba(255,255,255,0.3);
+        .online-prestige__quality {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            color: white;
+        }
+        .online-prestige__voice {
+            color: #aaa;
+            font-size: 14px;
         }
         .view--online {
-            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
-            border-radius: 0.5em;
-            margin: 0.5em;
-            padding: 1em;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 12px;
+            margin: 8px;
+            padding: 16px;
             text-align: center;
             font-weight: bold;
+            color: white;
+            border: none;
+        }
+        .view--online:hover {
+            background: linear-gradient(45deg, #764ba2, #667eea);
         }
         </style>
     `);
@@ -1104,45 +952,44 @@
 
     function resetTemplates() {
       Lampa.Template.add('online_prestige_full', `
-          <div class="online-prestige online-prestige--full selector">
-              <div class="online-prestige__body">
-                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5em;">
-                      <div class="online-prestige__title">{title}</div>
-                      <div class="online-prestige__quality">{quality}</div>
-                  </div>
-                  <div class="online-prestige__info">{info}</div>
+          <div class="online-prestige selector">
+              <div class="online-prestige__title">{title}</div>
+              <div class="online-prestige__info">
+                  <div class="online-prestige__voice">{info}</div>
+                  <div class="online-prestige__quality">{quality}</div>
               </div>
           </div>
       `);
       
       Lampa.Template.add('online_does_not_answer', `
-          <div style="padding: 2em; text-align: center; color: #888;">
-              <div style="font-size: 2em; margin-bottom: 0.5em;">🎬</div>
-              <div style="font-size: 1.2em; margin-bottom: 1em;">Online Video Plugin</div>
-              <div>Выберите вариант из списка выше для просмотра тестового видео</div>
+          <div style="padding: 40px 20px; text-align: center; color: #888;">
+              <div style="font-size: 48px; margin-bottom: 16px;">🎬</div>
+              <div style="font-size: 20px; margin-bottom: 16px; color: #fff;">Online Video Plugin</div>
+              <div style="font-size: 14px;">Выберите видео из списка для тестирования</div>
           </div>
       `);
       
       Lampa.Template.add('online_prestige_folder', `
-          <div class="online-prestige online-prestige--folder selector">
-              <div class="online-prestige__body">
-                  <div class="online-prestige__title">{title}</div>
-                  <div class="online-prestige__info">{info}</div>
+          <div class="online-prestige selector">
+              <div class="online-prestige__title">{title}</div>
+              <div class="online-prestige__info">
+                  <div class="online-prestige__voice">{info}</div>
               </div>
           </div>
       `);
     }
 
     var button = `
-        <div class="full-start__button selector view--online" data-subtitle="Online Video">
-            <div style="padding: 1em;">
-                <div style="font-size: 1.5em; margin-bottom: 0.5em;">🎬</div>
-                <span>Online Video</span>
+        <div class="full-start__button selector view--online">
+            <div style="padding: 12px;">
+                <div style="font-size: 24px; margin-bottom: 8px;">🎬</div>
+                <div style="font-size: 14px; font-weight: bold;">Online Video</div>
+                <div style="font-size: 11px; opacity: 0.8; margin-top: 4px;">Тестовые видео</div>
             </div>
         </div>
     `;
 
-    Lampa.Component.add('online_rezka', component);
+    Lampa.Component.add('online_video', component);
     resetTemplates();
     
     Lampa.Listener.follow('full', function(e) {
@@ -1150,11 +997,11 @@
         var btn = $(button);
         btn.on('hover:enter', function() {
           resetTemplates();
-          Lampa.Component.add('online_rezka', component);
+          Lampa.Component.add('online_video', component);
           Lampa.Activity.push({
             url: '',
             title: 'Online Video',
-            component: 'online_rezka',
+            component: 'online_video',
             search: e.data.movie.title,
             search_one: e.data.movie.title,
             search_two: e.data.movie.original_title,
@@ -1162,25 +1009,26 @@
             page: 1
           });
         });
-        var torrentBtn = e.object.activity.render().find('.view--torrent');
-        if (torrentBtn.length) {
-          torrentBtn.after(btn);
-        } else {
-          e.object.activity.render().find('.full-start__buttons').append(btn);
+        
+        var buttonsContainer = e.object.activity.render().find('.full-start__buttons');
+        if (buttonsContainer.length) {
+          buttonsContainer.append(btn);
         }
       }
     });
 
-    if (Lampa.Manifest.app_digital >= 177) {
-      Lampa.Storage.sync('online_choice_rezka', 'object_object');
-    }
-
+    console.log('✅ Online Video Plugin loaded successfully');
     Lampa.Noty.show('✅ Online Video plugin loaded');
   }
 
+  // Загружаем плагин после инициализации Lampa
   if (Lampa.Manifest.app_digital >= 155) {
-    // Загружаем с задержкой чтобы Lampa успел инициализироваться
-    setTimeout(startPlugin, 2000);
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', startPlugin);
+    } else {
+      setTimeout(startPlugin, 3000);
+    }
   }
 
 })();
+// V4.1
