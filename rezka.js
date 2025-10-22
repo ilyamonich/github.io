@@ -11,7 +11,6 @@
   var proxy_url = 'https://corsproxy.io/?';
   var api_url = 'https://rezka.ag/';
   var dev_token = 'user_dev_id=' + unic_id + '&user_dev_name=Lampa&user_dev_os=11&user_dev_vendor=RezkaAPI';
-  var modalopen = false;
 
   function rezkaapi(component, _object) {
     var network = new Lampa.Reguest();
@@ -26,7 +25,7 @@
       voice_name: ''
     };
 
-    // Функция для парсинга страницы Rezka
+    // Улучшенная функция для парсинга страницы Rezka
     function parseRezkaPage(html) {
       var data = {
         translations: [],
@@ -39,22 +38,42 @@
       try {
         // Получение названия
         var titleMatch = html.match(/<title>([^<]+)<\/title>/);
-        if (titleMatch) data.title = titleMatch[1].replace(/&#.*?;/g, '').trim();
+        if (titleMatch) data.title = titleMatch[1].replace(/&#.*?;/g, '').replace(/&nbsp;/g, ' ').trim();
 
-        // Определение типа контента (сериал или фильм)
-        data.is_series = html.indexOf('сезон') !== -1 || html.indexOf('series') !== -1;
+        // Определение типа контента
+        data.is_series = html.indexOf('сезон') !== -1 || 
+                         html.indexOf('series') !== -1 || 
+                         html.indexOf('эпизод') !== -1 ||
+                         html.indexOf('серии') !== -1;
 
-        // Парсинг переводов (озвучек)
-        var translatorsRegex = /<li class="b-translators__item[^>]*data-translator_id="(\d+)"[^>]*>[\s\S]*?<span class="b-translators__item-name">([^<]+)<\/span>/g;
+        // Улучшенный парсинг переводов
+        var translatorsRegex = /<li[^>]*class\s*=\s*"b-translators__item[^>]*data-translator_id\s*=\s*"(\d+)"[^>]*>[\s\S]*?<span[^>]*class\s*=\s*"b-translators__item-name[^>]*>([^<]+)<\/span>/gi;
         var translationMatch;
+        
         while ((translationMatch = translatorsRegex.exec(html)) !== null) {
           data.translations.push({
             id: translationMatch[1],
-            name: translationMatch[2].trim()
+            name: translationMatch[2].trim().replace(/&#.*?;/g, '').replace(/&nbsp;/g, ' ')
           });
         }
 
-        // Если переводы не найдены, добавляем стандартный
+        // Альтернативный поиск переводов
+        if (data.translations.length === 0) {
+          var altTranslators = html.match(/<li[^>]*data-translator_id\s*=\s*"\d+"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/gi);
+          if (altTranslators) {
+            altTranslators.forEach(function(item, index) {
+              var nameMatch = item.match(/<span[^>]*>([^<]+)<\/span>/);
+              if (nameMatch) {
+                data.translations.push({
+                  id: (index + 1).toString(),
+                  name: nameMatch[1].trim().replace(/&#.*?;/g, '').replace(/&nbsp;/g, ' ')
+                });
+              }
+            });
+          }
+        }
+
+        // Если переводы все еще не найдены, добавляем стандартный
         if (data.translations.length === 0) {
           data.translations.push({
             id: '1',
@@ -62,42 +81,91 @@
           });
         }
 
-        // Парсинг сезонов (для сериалов)
+        // Парсинг сезонов
         if (data.is_series) {
-          var seasonsRegex = /<li class="b-simple_season__item[^>]*data-tab_id="(\d+)"[^>]*data-season_id="(\d+)"[^>]*>[\s\S]*?<span class="b-simple_season__item-title">([^<]+)<\/span>/g;
+          var seasonsRegex = /<li[^>]*class\s*=\s*"b-simple_season__item[^>]*data-tab_id\s*=\s*"\d+"[^>]*data-season_id\s*=\s*"(\d+)"[^>]*>[\s\S]*?<span[^>]*class\s*=\s*"b-simple_season__item-title[^>]*>([^<]+)<\/span>/gi;
           var seasonMatch;
+          
           while ((seasonMatch = seasonsRegex.exec(html)) !== null) {
             data.seasons.push({
-              id: seasonMatch[2],
-              name: seasonMatch[3].trim()
+              id: seasonMatch[1],
+              name: seasonMatch[2].trim().replace(/&#.*?;/g, '').replace(/&nbsp;/g, ' ')
             });
           }
-        } else {
-          // Для фильмов - один "сезон"
+        }
+
+        // Если сезоны не найдены, но это сериал
+        if (data.is_series && data.seasons.length === 0) {
+          // Пробуем найти сезоны альтернативным способом
+          var altSeasons = html.match(/data-season_id\s*=\s*"(\d+)"[^>]*>[\s\S]*?([^<]+)<\//gi);
+          if (altSeasons) {
+            altSeasons.forEach(function(item) {
+              var idMatch = item.match(/data-season_id\s*=\s*"(\d+)"/);
+              var nameMatch = item.match(/>([^<]+)</);
+              if (idMatch && nameMatch) {
+                data.seasons.push({
+                  id: idMatch[1],
+                  name: nameMatch[1].trim()
+                });
+              }
+            });
+          }
+        }
+
+        // Если нет сезонов, создаем один
+        if (data.seasons.length === 0) {
           data.seasons.push({
             id: '1',
-            name: 'Фильм'
+            name: data.is_series ? 'Сезон 1' : 'Фильм'
           });
         }
 
-        // Парсинг эпизодов или фильма
-        if (data.is_series) {
-          var episodesRegex = /<li class="b-simple_episode__item[^>]*data-episode_id="(\d+)"[^>]*data-episode_url="([^"]*)"[^>]*>[\s\S]*?<span class="b-simple_episode__item-title">([^<]+)<\/span>/g;
-          var episodeMatch;
-          while ((episodeMatch = episodesRegex.exec(html)) !== null) {
-            data.episodes.push({
-              id: episodeMatch[1],
-              url: episodeMatch[2],
-              name: episodeMatch[3].trim()
+        // Парсинг эпизодов
+        var episodesRegex = /<li[^>]*class\s*=\s*"b-simple_episode__item[^>]*data-episode_id\s*=\s*"(\d+)"[^>]*data-episode_url\s*=\s*"([^"]*)"[^>]*>[\s\S]*?<span[^>]*class\s*=\s*"b-simple_episode__item-title[^>]*>([^<]+)<\/span>/gi;
+        var episodeMatch;
+        
+        while ((episodeMatch = episodesRegex.exec(html)) !== null) {
+          data.episodes.push({
+            id: episodeMatch[1],
+            url: episodeMatch[2],
+            name: episodeMatch[3].trim().replace(/&#.*?;/g, '').replace(/&nbsp;/g, ' ')
+          });
+        }
+
+        // Альтернативный поиск эпизодов
+        if (data.episodes.length === 0) {
+          var altEpisodes = html.match(/data-episode_url\s*=\s*"([^"]*)"[^>]*data-episode_id\s*=\s*"(\d+)"[^>]*>[\s\S]*?<span[^>]*>([^<]+)<\/span>/gi);
+          if (altEpisodes) {
+            altEpisodes.forEach(function(item) {
+              var urlMatch = item.match(/data-episode_url\s*=\s*"([^"]*)"/);
+              var idMatch = item.match(/data-episode_id\s*=\s*"(\d+)"/);
+              var nameMatch = item.match(/<span[^>]*>([^<]+)<\/span>/);
+              if (urlMatch && idMatch && nameMatch) {
+                data.episodes.push({
+                  id: idMatch[1],
+                  url: urlMatch[1],
+                  name: nameMatch[1].trim()
+                });
+              }
             });
           }
-        } else {
-          // Для фильма - один "эпизод" с основной страницы
-          var filmUrlMatch = html.match(/<a href="([^"]*)"[^>]*class="b-content__inline_item-link[^"]*"/);
-          if (filmUrlMatch) {
+        }
+
+        // Если эпизоды не найдены, создаем один для фильма
+        if (data.episodes.length === 0 && !data.is_series) {
+          // Пытаемся найти ссылку на просмотр
+          var watchLink = html.match(/<a[^>]*href\s*=\s*"([^"]*)"[^>]*class\s*=\s*"[^"]*watch[^"]*"[^>]*>/i);
+          if (watchLink) {
             data.episodes.push({
               id: '1',
-              url: filmUrlMatch[1],
+              url: watchLink[1],
+              name: 'Смотреть'
+            });
+          } else {
+            // Используем текущий URL как эпизод
+            data.episodes.push({
+              id: '1',
+              url: window.location.href,
               name: 'Просмотр'
             });
           }
@@ -105,45 +173,58 @@
 
       } catch (e) {
         console.error('Error parsing Rezka page:', e);
+        // Создаем базовую структуру при ошибке парсинга
+        if (data.translations.length === 0) {
+          data.translations.push({ id: '1', name: 'Оригинал' });
+        }
+        if (data.seasons.length === 0) {
+          data.seasons.push({ id: '1', name: 'Основной' });
+        }
+        if (data.episodes.length === 0) {
+          data.episodes.push({ id: '1', url: '#', name: 'Эпизод 1' });
+        }
       }
 
       return data;
     }
 
-    // Функция для получения видео URL
+    // Улучшенная функция поиска видео URL
     function getVideoUrl(episodeUrl, translationId) {
       return new Promise(function(resolve, reject) {
         var url = proxy_url + encodeURIComponent(episodeUrl);
         
+        network.timeout(15000);
         network.silent(url, function(html) {
           try {
-            // Поиск видео URL в различных форматах
             var videoUrl = null;
             
-            // Попытка 1: Поиск в JSON данных
-            var jsonMatch = html.match(/video\[0\]\s*=\s*({[^;]+});/);
-            if (jsonMatch) {
-              try {
-                var videoData = JSON.parse(jsonMatch[1]);
-                if (videoData.url) {
-                  videoUrl = videoData.url;
-                }
-              } catch (e) {}
+            // Попытка 1: Поиск в видео данных
+            var videoDataMatch = html.match(/video\s*:\s*{[\s\S]*?url\s*:\s*"([^"]+)"/);
+            if (videoDataMatch) {
+              videoUrl = videoDataMatch[1];
             }
             
-            // Попытка 2: Поиск в прямом URL
+            // Попытка 2: Поиск в плеере
             if (!videoUrl) {
-              var directMatch = html.match(/(https?:\/\/[^\s"']+\.(mp4|m3u8)[^\s"']*)/i);
-              if (directMatch) {
-                videoUrl = directMatch[1];
+              var playerMatch = html.match(/<video[^>]*src\s*=\s*"([^"]+)"/i);
+              if (playerMatch) {
+                videoUrl = playerMatch[1];
               }
             }
             
-            // Попытка 3: Поиск в file параметре
+            // Попытка 3: Поиск в iframe
             if (!videoUrl) {
-              var fileMatch = html.match(/file["']?:\s*["']([^"']+)["']/);
-              if (fileMatch) {
-                videoUrl = fileMatch[1];
+              var iframeMatch = html.match(/<iframe[^>]*src\s*=\s*"([^"]+)"/i);
+              if (iframeMatch) {
+                videoUrl = iframeMatch[1];
+              }
+            }
+
+            // Попытка 4: Поиск по ключевым словам
+            if (!videoUrl) {
+              var keywordsMatch = html.match(/(https?:\/\/[^\s"']*\.(mp4|m3u8|mkv|avi)[^\s"']*)/i);
+              if (keywordsMatch) {
+                videoUrl = keywordsMatch[1];
               }
             }
 
@@ -152,14 +233,22 @@
               if (videoUrl.startsWith('//')) {
                 videoUrl = 'https:' + videoUrl;
               }
+              if (videoUrl.startsWith('/')) {
+                videoUrl = 'https://rezka.ag' + videoUrl;
+              }
+              
+              console.log('Found video URL:', videoUrl);
               resolve(videoUrl);
             } else {
-              reject('Video URL not found on page');
+              console.log('Video URL not found in HTML');
+              reject('Video URL not found');
             }
           } catch (e) {
+            console.error('Error parsing video page:', e);
             reject('Error parsing video page: ' + e);
           }
         }, function(a, c) {
+          console.error('Network error getting video:', c);
           reject('Network error: ' + c);
         });
       });
@@ -170,94 +259,179 @@
     };
 
     function normalizeString(str) {
-      return str.toLowerCase().replace(/[^a-zа-я0-9]/g, '');
+      if (!str) return '';
+      return str.toLowerCase()
+        .replace(/[^a-zа-я0-9]/g, '')
+        .replace(/\s+/g, '')
+        .trim();
     }
 
+    // Улучшенный поиск по названию
     this.searchByTitle = function(_object, query) {
       var _this = this;
 
       object = _object;
       var year = parseInt((object.movie.release_date || object.movie.first_air_date || '0000').slice(0, 4));
       var orig = object.movie.original_name || object.movie.original_title;
+      var title = object.movie.title || object.movie.name;
       
-      // Поиск на Rezka.ag
-      var searchUrl = proxy_url + encodeURIComponent(api_url + 'search/?do=search&subaction=search&q=' + encodeURIComponent(query));
+      console.log('Searching for:', { query, year, orig, title });
       
-      network.clear();
-      network.timeout(10000);
-      network.silent(searchUrl, function(html) {
-        try {
-          var results = [];
-          
-          // Парсинг результатов поиска
-          var searchRegex = /<div class="b-content__inline_item[^>]*>[\s\S]*?<a href="([^"]*)"[^>]*title="([^"]*)"[^>]*>[\s\S]*?<div class="b-content__inline_item-year">([^<]*)<\/div>/g;
-          var searchMatch;
-          
-          while ((searchMatch = searchRegex.exec(html)) !== null) {
-            var itemUrl = searchMatch[1];
-            var itemTitle = searchMatch[2].replace(/&#.*?;/g, '').trim();
-            var itemYear = parseInt(searchMatch[3]) || 0;
+      // Пробуем разные варианты поиска
+      var searchQueries = [
+        query,
+        title,
+        orig,
+        object.movie.title + ' ' + year,
+        object.movie.original_title + ' ' + year
+      ];
+
+      function trySearch(searchQuery, attempt) {
+        var searchUrl = proxy_url + encodeURIComponent(api_url + 'search/?do=search&subaction=search&q=' + encodeURIComponent(searchQuery));
+        
+        console.log('Search attempt', attempt, 'with query:', searchQuery);
+        
+        network.clear();
+        network.timeout(15000);
+        network.silent(searchUrl, function(html) {
+          try {
+            var results = [];
             
-            if (itemYear >= year - 2 && itemYear <= year + 2) {
-              results.push({
-                url: itemUrl,
-                title: itemTitle,
-                year: itemYear,
-                id: itemUrl.split('/').pop().replace('.html', '')
-              });
+            // Улучшенный парсинг результатов поиска
+            var searchItems = html.split('<div class="b-content__inline_item');
+            
+            for (var i = 1; i < searchItems.length; i++) {
+              var item = searchItems[i];
+              
+              // Извлечение URL
+              var urlMatch = item.match(/href\s*=\s*"([^"]*)"/);
+              if (!urlMatch) continue;
+              
+              // Извлечение названия
+              var titleMatch = item.match(/<a[^>]*>([^<]*)<\/a>/);
+              if (!titleMatch) {
+                titleMatch = item.match(/title\s*=\s*"([^"]*)"/);
+              }
+              
+              // Извлечение года
+              var yearMatch = item.match(/<div[^>]*class\s*=\s*"b-content__inline_item-year[^>]*>([^<]*)<\/div>/);
+              var itemYear = yearMatch ? parseInt(yearMatch[1]) : 0;
+              
+              if (urlMatch && titleMatch) {
+                var itemTitle = titleMatch[1].replace(/&#.*?;/g, '').replace(/&nbsp;/g, ' ').trim();
+                var itemUrl = urlMatch[1];
+                
+                results.push({
+                  url: itemUrl,
+                  title: itemTitle,
+                  year: itemYear,
+                  id: itemUrl.split('/').pop().replace('.html', '')
+                });
+              }
+            }
+
+            console.log('Found', results.length, 'results');
+            
+            // Поиск наиболее подходящего результата
+            var bestMatch = null;
+            var normalizedOrig = normalizeString(orig);
+            var normalizedTitle = normalizeString(title);
+            
+            for (var j = 0; j < results.length; j++) {
+              var result = results[j];
+              var normalizedResult = normalizeString(result.title);
+              
+              // Проверяем совпадение по году и названию
+              var yearMatch = Math.abs(result.year - year) <= 2;
+              var titleMatch = normalizedResult.includes(normalizedOrig) || 
+                              normalizedResult.includes(normalizedTitle) ||
+                              normalizedOrig.includes(normalizedResult) ||
+                              normalizedTitle.includes(normalizedResult);
+              
+              if (yearMatch && titleMatch) {
+                bestMatch = result;
+                break;
+              }
+            }
+
+            // Если точного совпадения нет, берем первый результат
+            if (!bestMatch && results.length > 0) {
+              bestMatch = results[0];
+            }
+            
+            if (bestMatch) {
+              console.log('Selected best match:', bestMatch);
+              _this.find(bestMatch.id, bestMatch.url);
+            } else if (attempt < searchQueries.length - 1) {
+              // Пробуем следующий запрос
+              trySearch(searchQueries[attempt + 1], attempt + 1);
+            } else if (results.length > 0) {
+              // Показываем похожие результаты
+              wait_similars = true;
+              component.similars(results);
+              component.loading(false);
+            } else {
+              console.log('No results found');
+              component.doesNotAnswer();
+            }
+
+          } catch (e) {
+            console.error('Search parsing error:', e);
+            if (attempt < searchQueries.length - 1) {
+              trySearch(searchQueries[attempt + 1], attempt + 1);
+            } else {
+              component.doesNotAnswer();
             }
           }
-
-          // Поиск наиболее подходящего результата
-          var bestMatch = results.find(function(item) {
-            var normalizedItem = normalizeString(item.title);
-            var normalizedOrig = normalizeString(orig);
-            return item.year == year && normalizedItem.includes(normalizedOrig);
-          });
-
-          if (!bestMatch && results.length > 0) {
-            // Выбираем первый результат если точного совпадения нет
-            bestMatch = results[0];
-          }
-          
-          if (bestMatch) {
-            _this.find(bestMatch.id, bestMatch.url);
-          } else if (results.length) {
-            wait_similars = true;
-            component.similars(results);
-            component.loading(false);
+        }, function(a, c) {
+          console.error('Network search error:', c);
+          if (attempt < searchQueries.length - 1) {
+            trySearch(searchQueries[attempt + 1], attempt + 1);
           } else {
             component.doesNotAnswer();
           }
+        });
+      }
 
-        } catch (e) {
-          console.error('Search error:', e);
-          component.doesNotAnswer();
-        }
-      }, function(a, c) {
-        console.error('Network search error:', c);
-        component.doesNotAnswer();
-      });
+      // Начинаем поиск с первого запроса
+      trySearch(searchQueries[0], 0);
     };
 
     this.find = function(rezka_id, rezka_url) {
-      var url = rezka_url || (api_url + 'films/' + rezka_id + '.html');
+      var url = rezka_url;
+      
+      if (!url) {
+        // Пробуем разные варианты URL
+        var possibleUrls = [
+          api_url + 'films/' + rezka_id + '.html',
+          api_url + 'series/' + rezka_id + '.html',
+          api_url + 'animation/' + rezka_id + '.html',
+          rezka_id // если передан полный URL
+        ];
+        
+        url = possibleUrls[0];
+      }
 
+      console.log('Fetching URL:', url);
+      
       end_search(url);
 
       function end_search(url) {
         network.clear();
-        network.timeout(15000);
+        network.timeout(20000);
         var fullUrl = proxy_url + encodeURIComponent(url);
         
         network.silent(fullUrl, function(html) {
           if (html && html.length > 1000) {
             try {
               var parsedData = parseRezkaPage(html);
-              if (parsedData.translations.length > 0) {
+              console.log('Parsed data:', parsedData);
+              
+              if (parsedData.translations.length > 0 && parsedData.episodes.length > 0) {
                 success(parsedData, url);
                 component.loading(false);
               } else {
+                console.log('No translations or episodes found');
                 component.doesNotAnswer();
               }
             } catch (e) {
@@ -265,10 +439,11 @@
               component.doesNotAnswer();
             }
           } else {
+            console.log('HTML too short or empty');
             component.doesNotAnswer();
           }
         }, function(a, c) {
-          console.error('Network error:', c);
+          console.error('Network error fetching page:', c);
           component.doesNotAnswer();
         });
       }
@@ -330,12 +505,13 @@
             json: []
           };
 
-          // Обработка сезонов
+          // Обработка сезонов и эпизодов
           data.seasons.forEach(function(season) {
             var seasonEpisodes = data.episodes.filter(function(ep) {
+              // Фильтруем эпизоды по сезону
               return ep.url.includes('season=' + season.id) || 
                      ep.url.includes('&id=' + season.id) ||
-                     data.seasons.length === 1; // Для фильмов
+                     data.seasons.length === 1; // Для фильмов берем все эпизоды
             });
             
             var items = [];
@@ -365,24 +541,26 @@
             }
           });
 
-          // Если нет сезонов (для фильмов), создаем один
+          // Если нет сезонов с эпизодами, создаем структуру для фильма
           if (extract[translationKey].json.length === 0 && data.episodes.length > 0) {
             extract[translationKey].json.push({
               id: 1,
               comment: 'Фильм',
-              folder: [{
-                id: '1_1',
-                comment: data.episodes[0].name,
-                file: '',
-                episode: 1,
-                season: 1,
-                quality: 1080,
-                qualities: [360, 480, 720, 1080],
-                translation: translationKey,
-                translation_id: translation.id,
-                episode_url: data.episodes[0].url,
-                title: data.episodes[0].name
-              }],
+              folder: data.episodes.map(function(episode, index) {
+                return {
+                  id: '1_' + (index + 1),
+                  comment: episode.name,
+                  file: '',
+                  episode: index + 1,
+                  season: 1,
+                  quality: 1080,
+                  qualities: [360, 480, 720, 1080],
+                  translation: translationKey,
+                  translation_id: translation.id,
+                  episode_url: episode.url,
+                  title: episode.name
+                };
+              }),
               translation: translationKey
             });
           }
@@ -421,7 +599,7 @@
           .catch(function(error) {
             component.loading(false);
             console.error('Error getting video URL:', error);
-            Lampa.Noty.show('Ошибка получения видео: ' + error);
+            Lampa.Noty.show('Ошибка получения видео');
             resolve({
               file: '',
               quality: {}
@@ -455,6 +633,14 @@
               id: translation.id
             });
           });
+        }
+
+        // Корректируем выбор если нужно
+        if (choice.voice >= filter_items.voice.length) {
+          choice.voice = 0;
+        }
+        if (choice.season >= filter_items.season.length) {
+          choice.season = 0;
         }
 
         if (choice.voice_name) {
@@ -536,7 +722,7 @@
             if (extra.file) {
               var first = toPlayElement(item, extra.file, extra.quality);
 
-              if (items.length > 1) {
+              if (items.length > 1 && item.season) {
                 // Создаем плейлист для сериалов
                 var playlist = [];
                 var playPromises = items.map(function(elem) {
@@ -557,7 +743,7 @@
                 item.mark();
               }
             } else {
-              Lampa.Noty.show(Lampa.Lang.translate('online_nolink'));
+              Lampa.Noty.show('Не удалось получить ссылку на видео');
             }
           });
         },
@@ -570,7 +756,7 @@
     }
   }
 
-  // Компонент интерфейса
+  // Компонент интерфейса (остается без изменений)
   function component(object) {
     var network = new Lampa.Reguest();
     var scroll = new Lampa.Scroll({
@@ -1301,7 +1487,6 @@
       scroll.destroy();
       clearInterval(balanser_timer);
       if (source && source.destroy) source.destroy();
-      if (modalopen) {modalopen = false; Lampa.Modal.close();}
     };
   }
 
@@ -1309,7 +1494,7 @@
     window.online_rezka = true;
     var manifest = {
       type: 'video',
-      version: '1.0.0',
+      version: '1.0.1',
       name: 'Онлайн - Rezka.ag',
       description: 'Плагин для просмотра онлайн сериалов и фильмов с Rezka.ag',
       component: 'online_rezkaapi',
@@ -1439,6 +1624,12 @@
         en: 'Reset',
         ua: 'Скинути',
         zh: '重置'
+      },
+      empty_title_two: {
+        ru: 'Ничего не найдено',
+        en: 'Nothing found',
+        ua: 'Нічого не знайдено',
+        zh: '没有找到任何内容'
       }
     });
 
@@ -1513,4 +1704,4 @@
   if (!window.online_rezka && Lampa.Manifest.app_digital >= 155) startPlugin();
 
 })();
-// V1
+// V1.1
