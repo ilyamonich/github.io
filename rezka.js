@@ -3,6 +3,7 @@
 
   var plugin_name = 'rezka';
   var modalopen = false;
+  var plugin_loaded = false;
 
   function rezkaAPI(component, _object) {
     var network = new Lampa.Reguest();
@@ -21,7 +22,7 @@
       return [
         {
           id: 1,
-          title: '🎬 Демо видео 1',
+          title: '🎬 Демо видео 1 (Big Buck Bunny)',
           translation: 'Русская озвучка',
           quality: '720p',
           qualities: ['480', '720'],
@@ -30,7 +31,7 @@
         },
         {
           id: 2,
-          title: '🎬 Демо видео 2', 
+          title: '🎬 Демо видео 2 (Elephants Dream)', 
           translation: 'Оригинал с субтитрами',
           quality: '1080p',
           qualities: ['720', '1080'],
@@ -39,7 +40,7 @@
         },
         {
           id: 3,
-          title: '🎬 Демо видео 3',
+          title: '🎬 Демо видео 3 (For Bigger Blazes)',
           translation: 'Многоголосый перевод',
           quality: '480p',
           qualities: ['360', '480'],
@@ -59,7 +60,7 @@
       var _this = this;
       object = _object;
       
-      Lampa.Noty.show('🔍 Поиск: ' + (query || 'демо видео'));
+      Lampa.Noty.show('🔍 Ищем видео...');
       
       setTimeout(function() {
         var searchResults = [
@@ -92,7 +93,6 @@
           }
         };
 
-        // Добавляем тестовые видео
         var testVideos = getTestVideos();
         testVideos.forEach(function(video) {
           videoData.player_links.movie.push({
@@ -107,7 +107,7 @@
         if (videoData.player_links.movie.length > 0) {
           _this.success(videoData);
           component.loading(false);
-          Lampa.Noty.show('✅ Готово к просмотру!');
+          Lampa.Noty.show('✅ Готово! Выберите видео для просмотра');
         } else {
           component.doesNotAnswer();
         }
@@ -165,9 +165,7 @@
       }
     }
 
-    function extractData(data) {
-      // Минимальная логика извлечения данных
-    }
+    function extractData(data) {}
 
     function getFile(element, max_quality) {
       var quality_num = parseInt(max_quality) || 720;
@@ -279,7 +277,6 @@
                   item.mark();
                 }
               } catch (e) {
-                console.error('Play error:', e);
                 Lampa.Noty.show('❌ Ошибка: ' + e.message);
               }
             } else {
@@ -319,9 +316,7 @@
     var images = [];
 
     this.activity = {
-      loader: function(status) {
-        // Заглушка для совместимости
-      },
+      loader: function(status) {},
       toggle: function() {}
     };
 
@@ -806,13 +801,14 @@
   }
 
   function startPlugin() {
-    if (window.rezka_plugin) return;
+    if (plugin_loaded) return;
+    plugin_loaded = true;
     
-    window.rezka_plugin = true;
+    console.log('🚀 Initializing Rezka Plugin...');
     
     var manifest = {
       type: 'video',
-      version: '1.0.5',
+      version: '1.0.6',
       name: 'Rezka (Demo)',
       description: 'Демо плагин для просмотра онлайн видео',
       component: 'online_rezka',
@@ -889,15 +885,28 @@
             color: white;
             border: none;
             cursor: pointer;
-        }
-        .view--online-rezka:hover {
-            background: linear-gradient(45deg, #764ba2, #667eea);
-        }
-        .full-start__button.view--online-rezka {
             min-height: 80px;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-direction: column;
+        }
+        .view--online-rezka:hover, .view--online-rezka.focus {
+            background: linear-gradient(45deg, #764ba2, #667eea);
+            transform: scale(1.02);
+        }
+        .rezka-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+        .rezka-title {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .rezka-subtitle {
+            font-size: 11px;
+            opacity: 0.8;
+            margin-top: 4px;
         }
         </style>
     `);
@@ -932,131 +941,170 @@
       `);
     }
 
-    // Создаем кнопку для Rezka
-    function createRezkaButton() {
-        var button = document.createElement('div');
-        button.className = 'full-start__button selector view--online-rezka';
-        button.innerHTML = `
-            <div style="padding: 12px; text-align: center;">
-                <div style="font-size: 24px; margin-bottom: 8px;">🎬</div>
-                <div style="font-size: 14px; font-weight: bold;">Rezka</div>
-                <div style="font-size: 11px; opacity: 0.8; margin-top: 4px;">Демо режим</div>
-            </div>
-        `;
+    // Функция для добавления кнопки Rezka
+    function addRezkaButton() {
+        console.log('🔍 Searching for buttons container...');
         
-        button.addEventListener('click', function() {
-            resetTemplates();
-            Lampa.Component.add('online_rezka', component);
-            Lampa.Activity.push({
-                url: '',
-                title: 'Rezka (Demo)',
-                component: 'online_rezka',
-                search: '',
-                movie: window.Lampa.Activity.active().movie || {},
-                page: 1
+        // Пробуем разные селекторы контейнеров
+        var selectors = [
+            '.full-start__buttons',
+            '.broadcast__buttons',
+            '.selector__cards',
+            '.card__buttons',
+            '.full-buttons',
+            '[class*="button"]',
+            '[class*="start"]',
+            '[class*="broadcast"]'
+        ];
+        
+        var container = null;
+        
+        for (var i = 0; i < selectors.length; i++) {
+            container = document.querySelector(selectors[i]);
+            if (container) {
+                console.log('✅ Found container with selector:', selectors[i]);
+                break;
+            }
+        }
+        
+        if (!container) {
+            console.log('❌ No container found, trying to create one...');
+            // Пробуем найти любой контейнер с кнопками
+            var allContainers = document.querySelectorAll('div');
+            for (var j = 0; j < allContainers.length; j++) {
+                var div = allContainers[j];
+                if (div.children.length > 0) {
+                    var hasButtons = false;
+                    for (var k = 0; k < div.children.length; k++) {
+                        var child = div.children[k];
+                        if (child.className && (
+                            child.className.includes('button') || 
+                            child.className.includes('torrent') ||
+                            child.className.includes('view--')
+                        )) {
+                            hasButtons = true;
+                            break;
+                        }
+                    }
+                    if (hasButtons) {
+                        container = div;
+                        console.log('✅ Found potential container');
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if (container) {
+            // Проверяем, нет ли уже кнопки Rezka
+            var existingButton = container.querySelector('.view--online-rezka');
+            if (existingButton) {
+                console.log('ℹ️ Rezka button already exists');
+                return;
+            }
+            
+            // Создаем кнопку Rezka
+            var rezkaButton = document.createElement('div');
+            rezkaButton.className = 'full-start__button selector view--online-rezka';
+            rezkaButton.innerHTML = `
+                <div class="rezka-icon">🎬</div>
+                <div class="rezka-title">Rezka</div>
+                <div class="rezka-subtitle">Демо режим</div>
+            `;
+            
+            // Добавляем обработчик клика
+            rezkaButton.addEventListener('click', function() {
+                console.log('🎬 Rezka button clicked');
+                var currentActivity = Lampa.Activity.active();
+                if (currentActivity && currentActivity.movie) {
+                    resetTemplates();
+                    Lampa.Component.add('online_rezka', component);
+                    Lampa.Activity.push({
+                        url: '',
+                        title: 'Rezka (Demo)',
+                        component: 'online_rezka',
+                        search: currentActivity.movie.title,
+                        search_one: currentActivity.movie.title,
+                        search_two: currentActivity.movie.original_title,
+                        movie: currentActivity.movie,
+                        page: 1
+                    });
+                } else {
+                    Lampa.Noty.show('❌ Нет информации о фильме');
+                }
             });
-        });
-        
-        return button;
+            
+            // Добавляем кнопку в контейнер
+            container.appendChild(rezkaButton);
+            console.log('✅ Rezka button added successfully!');
+            
+            // Показываем уведомление
+            setTimeout(function() {
+                Lampa.Noty.show('✅ Rezka plugin loaded');
+            }, 1000);
+            
+        } else {
+            console.log('❌ Could not find buttons container');
+            // Пробуем еще раз через секунду
+            setTimeout(addRezkaButton, 1000);
+        }
     }
 
     Lampa.Component.add('online_rezka', component);
     resetTemplates();
     
-    // Слушаем событие загрузки карточки фильма
+    // Слушаем различные события для добавления кнопки
     Lampa.Listener.follow('full', function(e) {
+        console.log('📺 Full event:', e.type);
         if (e.type == 'complite') {
-            // Ждем пока полностью загрузится интерфейс
-            setTimeout(function() {
-                var buttonsContainer = document.querySelector('.full-start__buttons');
-                if (buttonsContainer) {
-                    // Проверяем, нет ли уже нашей кнопки
-                    var existingButton = buttonsContainer.querySelector('.view--online-rezka');
-                    if (!existingButton) {
-                        var rezkaButton = createRezkaButton();
-                        buttonsContainer.appendChild(rezkaButton);
-                        console.log('✅ Rezka button added successfully');
-                    }
-                } else {
-                    console.log('❌ Buttons container not found');
-                    // Пробуем найти контейнер позже
-                    setTimeout(function() {
-                        var buttonsContainer = document.querySelector('.full-start__buttons');
-                        if (buttonsContainer) {
-                            var existingButton = buttonsContainer.querySelector('.view--online-rezka');
-                            if (!existingButton) {
-                                var rezkaButton = createRezkaButton();
-                                buttonsContainer.appendChild(rezkaButton);
-                                console.log('✅ Rezka button added on second attempt');
-                            }
-                        }
-                    }, 1000);
-                }
-            }, 500);
+            setTimeout(addRezkaButton, 500);
         }
     });
-
-    // Альтернативный способ - добавляем кнопку при клике на меню
+    
+    Lampa.Listener.follow('activity', function(e) {
+        console.log('🔄 Activity event:', e.type);
+        if (e.type == 'create' && e.data && e.data.component === 'full') {
+            setTimeout(addRezkaButton, 1000);
+        }
+    });
+    
     Lampa.Listener.follow('controller', function(e) {
-        if (e.type == 'context' && e.data && e.data.name === 'more') {
-            setTimeout(function() {
-                var contextMenu = document.querySelector('.selectbox');
-                if (contextMenu) {
-                    // Добавляем пункт в контекстное меню
-                    var rezkaItem = document.createElement('div');
-                    rezkaItem.className = 'selector';
-                    rezkaItem.innerHTML = `
-                        <div style="padding: 12px; display: flex; align-items: center;">
-                            <div style="font-size: 20px; margin-right: 12px;">🎬</div>
-                            <div>
-                                <div style="font-weight: bold;">Rezka (демо)</div>
-                                <div style="font-size: 12px; opacity: 0.7;">Тестовые видео</div>
-                            </div>
-                        </div>
-                    `;
-                    rezkaItem.addEventListener('click', function() {
-                        resetTemplates();
-                        Lampa.Component.add('online_rezka', component);
-                        Lampa.Activity.push({
-                            url: '',
-                            title: 'Rezka (Demo)',
-                            component: 'online_rezka', 
-                            search: '',
-                            movie: window.Lampa.Activity.active().movie || {},
-                            page: 1
-                        });
-                        Lampa.Select.close();
-                    });
-                    
-                    contextMenu.querySelector('.selectbox__body').appendChild(rezkaItem);
-                }
-            }, 100);
+        if (e.type === 'focus') {
+            setTimeout(addRezkaButton, 500);
         }
     });
 
-    console.log('✅ Rezka Plugin loaded successfully');
+    // Пробуем добавить кнопку сразу и периодически
+    setTimeout(addRezkaButton, 2000);
+    setInterval(addRezkaButton, 5000);
+
+    console.log('✅ Rezka Plugin initialization complete');
   }
 
-  // Загружаем плагин
+  // Загрузка плагина
   if (Lampa.Manifest.app_digital >= 155) {
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', startPlugin);
-    } else {
-      // Ждем полной загрузки Lampa
-      var checkLampa = setInterval(function() {
-        if (window.Lampa && window.Lampa.Manifest) {
-          clearInterval(checkLampa);
-          startPlugin();
+    console.log('🟡 Lampa detected, starting Rezka plugin...');
+    
+    // Ждем полной загрузки Lampa
+    var attempts = 0;
+    var maxAttempts = 10;
+    
+    var initInterval = setInterval(function() {
+        attempts++;
+        
+        if (window.Lampa && window.Lampa.Manifest && window.Lampa.Activity) {
+            clearInterval(initInterval);
+            console.log('🟢 Lampa fully loaded, starting plugin...');
+            setTimeout(startPlugin, 1000);
+        } else if (attempts >= maxAttempts) {
+            clearInterval(initInterval);
+            console.log('❌ Failed to load Lampa after', maxAttempts, 'attempts');
+        } else {
+            console.log('🟡 Waiting for Lampa... attempt', attempts);
         }
-      }, 1000);
-      
-      // На всякий случай запускаем через 5 секунд
-      setTimeout(function() {
-        if (!window.rezka_plugin) {
-          startPlugin();
-        }
-      }, 5000);
-    }
+    }, 1000);
+  } else {
+    console.log('❌ Lampa version not supported');
   }
 
 })();
